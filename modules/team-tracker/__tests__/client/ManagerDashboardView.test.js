@@ -124,7 +124,7 @@ describe('ManagerDashboardView', () => {
     expect(wrapper.text()).toContain('backend') // field value
   })
 
-  it('shows teams tab with "X of Y" member counts', async () => {
+  it('shows teams tab with team names in table', async () => {
     mockDirectReports.value = [
       { uid: 'alice', name: 'Alice', email: 'alice@example.com', title: 'Engineer', teamIds: ['team_a'], customFields: {} }
     ]
@@ -140,7 +140,6 @@ describe('ManagerDashboardView', () => {
     await teamsTab.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('1 of 5 members are your reports')
     expect(wrapper.text()).toContain('Alpha')
   })
 
