@@ -632,6 +632,24 @@ module.exports = function registerRoutes(router, context) {
           .map(t => ({ id: t.id, name: t.name, orgKey: t.orgKey }))
       : [];
 
+    // Build a uid->name map for person-reference-linked values in team metadata
+    const referencedPeople = {};
+    const personRefTeamFields = teamFieldDefs.filter(f => f.type === 'person-reference-linked');
+    if (personRefTeamFields.length > 0) {
+      for (const team of purview.teams) {
+        for (const field of personRefTeamFields) {
+          const val = team.metadata[field.id];
+          const uids = Array.isArray(val) ? val : (val ? [val] : []);
+          for (const uid of uids) {
+            if (uid && !referencedPeople[uid]) {
+              const person = registry.people[uid];
+              referencedPeople[uid] = person?.name || uid;
+            }
+          }
+        }
+      }
+    }
+
     const response = {
       manager: managerPerson ? {
         uid: req.userUid,
@@ -641,6 +659,7 @@ module.exports = function registerRoutes(router, context) {
       directReports,
       teams: purview.teams,
       allOrgTeams,
+      referencedPeople,
       fieldDefinitions: {
         person: personFieldDefs,
         team: teamFieldDefs

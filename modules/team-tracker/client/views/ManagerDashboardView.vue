@@ -317,11 +317,35 @@
 
             <!-- Team metadata (read-only) -->
             <div v-if="teamFieldDefs.length > 0 && hasTeamMetadata(team)" class="mt-3 mb-3">
-              <div class="grid grid-cols-2 gap-2 text-sm">
+              <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 <template v-for="field in visibleTeamFields" :key="field.id">
-                  <div v-if="team.metadata[field.id] != null" class="flex items-center gap-2">
-                    <span class="text-gray-500 dark:text-gray-400">{{ field.label }}:</span>
-                    <span class="text-gray-900 dark:text-gray-100">{{ team.metadata[field.id] }}</span>
+                  <div v-if="team.metadata[field.id] != null" class="flex items-start gap-2">
+                    <span class="text-gray-500 dark:text-gray-400 shrink-0">{{ field.label }}:</span>
+                    <!-- Person reference: show as clickable links -->
+                    <template v-if="field.type === 'person-reference-linked'">
+                      <div class="flex flex-wrap gap-1">
+                        <button
+                          v-for="uid in normalizeArray(team.metadata[field.id])"
+                          :key="uid"
+                          @click="navigateToPersonDetail(uid)"
+                          class="text-primary-600 dark:text-primary-400 hover:underline"
+                        >{{ referencedPeople[uid] || uid }}</button>
+                      </div>
+                    </template>
+                    <!-- Multi-value constrained: show as pills -->
+                    <template v-else-if="field.type === 'constrained' && field.multiValue">
+                      <div class="flex flex-wrap gap-1">
+                        <span
+                          v-for="v in normalizeArray(team.metadata[field.id])"
+                          :key="v"
+                          class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        >{{ v }}</span>
+                      </div>
+                    </template>
+                    <!-- Default: plain text -->
+                    <template v-else>
+                      <span class="text-gray-900 dark:text-gray-100">{{ Array.isArray(team.metadata[field.id]) ? team.metadata[field.id].join(', ') : team.metadata[field.id] }}</span>
+                    </template>
                   </div>
                 </template>
               </div>
@@ -400,7 +424,7 @@ import PersonAutocomplete from '../components/PersonAutocomplete.vue'
 
 const nav = inject('moduleNav', null)
 
-const { directReports, indirectReports, teams, allOrgTeams, fieldDefinitions, loading, error, reason, includeIndirect, load, refresh } = useManagerDashboard()
+const { directReports, indirectReports, teams, allOrgTeams, referencedPeople, fieldDefinitions, loading, error, reason, includeIndirect, load, refresh } = useManagerDashboard()
 const { updatePersonFields } = useFieldDefinitions()
 const { reloadRoster } = useRoster()
 
@@ -720,6 +744,10 @@ function getReportName(uid) {
 function getReportTitle(uid) {
   const r = getReport(uid)
   return r ? r.title : null
+}
+
+function normalizeArray(val) {
+  return Array.isArray(val) ? val : (val ? [val] : [])
 }
 
 function hasTeamMetadata(team) {
