@@ -113,7 +113,7 @@ function handleNavigateToFeature(featureKey) {
 watch([() => moduleNav.params.value, rfeData], ([params]) => {
   if (params?.select && rfeData.value?.issues) {
     const rfe = rfeData.value.issues.find(r => r.key === params.select)
-    if (rfe) {
+    if (rfe && selectedRFE.value?.key !== rfe.key) {
       filter.value = 'all'
       searchQuery.value = ''
       passFailFilter.value = 'all'
@@ -121,7 +121,7 @@ watch([() => moduleNav.params.value, rfeData], ([params]) => {
       statusFilter.value = 'all'
       selectedRFE.value = rfe
       notFoundRFE.value = null
-    } else {
+    } else if (!rfe) {
       notFoundRFE.value = params.select
     }
   }

@@ -48,7 +48,7 @@ function handleNavigateToRFE(rfeKey) {
 watch(() => moduleNav.params.value, (params) => {
   if (params?.select && Object.keys(features.value).length > 0) {
     const feature = Object.values(features.value).find(f => f.key === params.select)
-    if (feature) {
+    if (feature && selectedFeature.value?.key !== feature.key) {
       searchQuery.value = ''
       recommendationFilter.value = 'all'
       priorityFilter.value = 'all'
