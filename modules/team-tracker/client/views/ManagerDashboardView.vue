@@ -1,6 +1,16 @@
 <template>
   <div class="max-w-7xl mx-auto px-4 py-6">
-    <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">My Teams</h2>
+    <div data-tour="dashboard-header" class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">My Teams</h2>
+      <button
+        v-if="!loading && !error && reason !== 'no-registry-identity'"
+        @click="handleLaunchTutorial"
+        class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        title="Dashboard tour"
+      >
+        <CircleQuestionMark class="w-5 h-5" />
+      </button>
+    </div>
 
     <!-- Loading state -->
     <div v-if="loading" class="text-center py-12 text-gray-500 dark:text-gray-400">
@@ -27,7 +37,7 @@
     <!-- Dashboard content -->
     <template v-else>
       <!-- Include indirect reports toggle -->
-      <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4 cursor-pointer select-none">
+      <label data-tour="indirect-toggle" class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4 cursor-pointer select-none">
         <button
           role="switch"
           :aria-checked="includeIndirect"
@@ -49,6 +59,7 @@
           v-for="tab in tabs"
           :key="tab.id"
           @click="activeTab = tab.id"
+          :data-tour="tab.id === 'teams' ? 'tab-teams' : undefined"
           class="pb-2 px-1 text-sm font-medium border-b-2 transition-colors"
           :class="activeTab === tab.id
             ? 'border-primary-600 text-primary-600'
@@ -86,6 +97,7 @@
             </template>
             <button
               v-else
+              data-tour="edit-all-btn"
               class="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors flex items-center gap-1.5"
               @click="enterBulkEdit"
             >
@@ -95,7 +107,7 @@
           </div>
 
           <!-- Search -->
-          <div class="relative mb-3">
+          <div data-tour="search-reports" class="relative mb-3">
             <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
             <input
               v-model="searchQuery"
@@ -139,8 +151,9 @@
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" :class="bulkEditing ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'">Title</th>
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" :class="bulkEditing ? 'text-primary-700 dark:text-primary-300 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-500 dark:text-gray-400'">Team(s)</th>
                 <th
-                  v-for="field in visiblePersonFields"
+                  v-for="(field, idx) in visiblePersonFields"
                   :key="field.id"
+                  :data-tour="idx === 0 ? 'field-cell' : undefined"
                   class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider"
                   :class="bulkEditing ? 'text-primary-700 dark:text-primary-300 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-500 dark:text-gray-400'"
                 >{{ field.label }}</th>
@@ -384,7 +397,7 @@
             No teams match "{{ teamSearchQuery }}"
           </div>
 
-          <div v-else class="overflow-x-auto">
+          <div v-else data-tour="team-fields-table" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead class="bg-gray-50 dark:bg-gray-800">
                 <tr>
@@ -400,13 +413,15 @@
               </thead>
               <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 <tr
-                  v-for="team in filteredTeams"
+                  v-for="(team, idx) in filteredTeams"
                   :key="team.id"
                   class="hover:bg-gray-50 dark:hover:bg-gray-700/50"
                 >
                   <!-- Team name -->
                   <td class="px-4 py-3 text-sm whitespace-nowrap" :class="teamBulkEditing ? 'opacity-50' : ''">
                     <button
+                      :data-tour="idx === 0 ? 'first-team-link' : undefined"
+                      :data-tour-team-key="idx === 0 ? `${team.orgKey}::${team.name}` : undefined"
                       @click="navigateToTeamDetail(team)"
                       class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
                     >{{ team.name }}</button>
@@ -569,12 +584,13 @@
       @close="boardsDrawerTeam = null"
       @saved="refresh()"
     />
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted, inject, watch } from 'vue'
-import { ExternalLink, Pencil, Search, X, AlertTriangle } from 'lucide-vue-next'
+import { ref, computed, reactive, onMounted, onBeforeUnmount, inject, watch } from 'vue'
+import { ExternalLink, Pencil, Search, X, AlertTriangle, CircleQuestionMark } from 'lucide-vue-next'
 import { useManagerDashboard } from '../composables/useManagerDashboard'
 import { useFieldDefinitions } from '@shared/client/composables/useFieldDefinitions'
 import { useTeams } from '@shared/client/composables/useTeams'
@@ -583,6 +599,7 @@ import { apiRequest } from '@shared/client/services/api'
 import ConstrainedAutocomplete from '../components/ConstrainedAutocomplete.vue'
 import PersonAutocomplete from '../components/PersonAutocomplete.vue'
 import TeamBoardsDrawer from '../components/TeamBoardsDrawer.vue'
+import { useManagerTutorial } from '../composables/useManagerTutorial'
 
 const nav = inject('moduleNav', null)
 
@@ -590,6 +607,7 @@ const { directReports, indirectReports, teams, allOrgTeams, allPeople, reference
 const { updatePersonFields } = useFieldDefinitions()
 const { updateTeamFields } = useTeams()
 const { reloadRoster } = useRoster()
+const { launchTutorial, destroyTour, checkFirstVisit } = useManagerTutorial()
 
 const activeTab = ref('reports')
 const searchQuery = ref('')
@@ -1185,7 +1203,26 @@ watch(teamBulkEditing, () => {
   showIncompleteOnly.value = false
 })
 
+function handleLaunchTutorial() {
+  launchTutorial({ onTabClick: (tabId) => { activeTab.value = tabId }, nav })
+}
+
+watch(loading, (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading && !error.value && !reason.value) {
+    const opts = { onTabClick: (tabId) => { activeTab.value = tabId }, nav }
+    if (nav?.params.value?.tutorial === '1') {
+      launchTutorial(opts)
+    } else {
+      checkFirstVisit(opts)
+    }
+  }
+}, { once: true })
+
 onMounted(() => {
   load()
+})
+
+onBeforeUnmount(() => {
+  destroyTour()
 })
 </script>

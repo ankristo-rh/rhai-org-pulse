@@ -36,6 +36,17 @@ vi.mock('../../client/composables/useManagerDashboard', () => ({
   })
 }))
 
+// Mock useManagerTutorial
+vi.mock('../../client/composables/useManagerTutorial', () => ({
+  useManagerTutorial: () => ({
+    showTutorial: ref(false),
+    launchTutorial: vi.fn(),
+    destroyTour: vi.fn(),
+    checkFirstVisit: vi.fn(),
+    resumeTourIfActive: vi.fn()
+  })
+}))
+
 // Mock PersonFieldEditor
 vi.mock('../../client/components/PersonFieldEditor.vue', () => ({
   default: {
@@ -68,6 +79,7 @@ function mountView() {
         ExternalLink: { template: '<span class="external-link-icon" />' },
         ChevronDown: { template: '<span class="chevron-down-icon" />' },
         AlertTriangle: { template: '<span class="alert-triangle-icon" />' },
+        CircleQuestionMark: { template: '<span />' },
         ConstrainedAutocomplete: { template: '<div />', props: ['modelValue', 'options', 'multiValue'] },
         PersonAutocomplete: { template: '<div />', props: ['modelValue', 'people'] }
       }

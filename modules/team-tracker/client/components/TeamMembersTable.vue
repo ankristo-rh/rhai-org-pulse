@@ -90,7 +90,7 @@
       </thead>
       <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
         <tr
-          v-for="member in sortedMembers"
+          v-for="(member, idx) in sortedMembers"
           :key="member.name"
           class="hover:bg-gray-50 dark:hover:bg-gray-700/50"
           :class="{ 'opacity-50': getStatus(member) === 'Not Confirmed' }"
@@ -98,6 +98,8 @@
           <td class="px-4 py-3 text-sm whitespace-nowrap">
             <a
               :href="personLink(member)"
+              :data-tour="idx === 0 ? 'first-member-link' : undefined"
+              :data-tour-person-uid="idx === 0 ? member.uid : undefined"
               class="text-primary-600 hover:underline"
               @click.stop
             >

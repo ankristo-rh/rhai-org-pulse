@@ -123,6 +123,7 @@
           <!-- Team fields (in-app mode, inline) -->
           <TeamFieldEditor
             v-if="isInAppMode && team.teamId && hasVisibleTeamFields"
+            data-tour="team-field-editor"
             :teamId="team.teamId"
             :metadata="team.metadata"
             :fieldDefinitions="definitions.teamFields"
@@ -258,7 +259,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, inject, watch } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount, inject, watch } from 'vue'
 import TeamOverviewTab from '../components/TeamOverviewTab.vue'
 import TeamDeliveryTab from '../components/TeamDeliveryTab.vue'
 import TeamBacklogTab from '../components/TeamBacklogTab.vue'
@@ -271,6 +272,7 @@ import { usePermissions } from '@shared/client/composables/usePermissions'
 import { useFieldDefinitions } from '@shared/client/composables/useFieldDefinitions'
 import { useOrgRoster } from '../composables/useOrgRoster'
 import { refreshMetrics, getTeamMetrics, apiRequest } from '@shared/client/services/api'
+import { useManagerTutorial } from '../composables/useManagerTutorial'
 
 const nav = inject('moduleNav')
 const { teams: allTeams, rosterData, loading: rosterLoading, reloadRoster } = useRoster()
@@ -279,6 +281,7 @@ const { loadGitlabStats } = useGitlabStats()
 const { isAdmin } = useAuth()
 const { canEditTeam, managedUids } = usePermissions()
 const { definitions, fetchDefinitions } = useFieldDefinitions()
+const { resumeTourIfActive, destroyTour } = useManagerTutorial()
 
 const isInAppMode = computed(() => rosterData.value?.teamDataSource === 'in-app')
 
@@ -573,6 +576,11 @@ onMounted(() => {
   fetchRfeConfig()
   loadGitlabStats()
   fetchDefinitions()
+  resumeTourIfActive('team-detail')
+})
+
+onBeforeUnmount(() => {
+  destroyTour()
 })
 
 watch(() => nav.params.value?.teamKey, () => {

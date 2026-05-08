@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, inject } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, inject } from 'vue'
 import { apiRequest } from '@shared/client/services/api.js'
 import { useAuth } from '@shared/client/composables/useAuth.js'
 import { useRoster } from '@shared/client/composables/useRoster.js'
@@ -9,6 +9,7 @@ import { usePermissions } from '@shared/client/composables/usePermissions.js'
 import { useImpersonation } from '@shared/client/composables/useImpersonation.js'
 import { useFieldDefinitions } from '@shared/client/composables/useFieldDefinitions.js'
 import PersonFieldEditor from '../components/PersonFieldEditor.vue'
+import { useManagerTutorial } from '../composables/useManagerTutorial'
 
 const nav = inject('moduleNav')
 const { isAdmin, refresh: refreshAuth } = useAuth()
@@ -16,6 +17,7 @@ const { getTeamsForPerson, teams: allTeams, rosterData } = useRoster()
 const { canEdit, refresh: refreshPermissions } = usePermissions()
 const { startImpersonating } = useImpersonation()
 const { definitions, fetchDefinitions } = useFieldDefinitions()
+const { resumeTourIfActive, destroyTour } = useManagerTutorial()
 
 const isInAppMode = computed(() => rosterData.value?.teamDataSource === 'in-app')
 const visiblePersonFields = computed(() =>
@@ -210,6 +212,11 @@ onMounted(() => {
   loadPerson()
   loadGitlabStats()
   fetchDefinitions()
+  resumeTourIfActive('person-detail')
+})
+
+onBeforeUnmount(() => {
+  destroyTour()
 })
 </script>
 
@@ -234,7 +241,7 @@ onMounted(() => {
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 space-y-6">
           <!-- Profile Card -->
-          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div data-tour="person-profile-card" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
             <div class="flex items-start gap-4 mb-5">
               <!-- Avatar -->
               <div class="w-14 h-14 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
@@ -292,6 +299,7 @@ onMounted(() => {
             <!-- Custom Fields (in-app mode) -->
             <PersonFieldEditor
               v-if="isInAppMode && visiblePersonFields.length > 0"
+              data-tour="person-field-editor"
               :uid="person.uid"
               :customFields="person._appFields || {}"
               :fieldDefinitions="visiblePersonFields"

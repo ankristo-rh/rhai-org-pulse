@@ -37,6 +37,7 @@ export default defineConfig({
               req.url.includes('.vue?') ||
               req.url.endsWith('.json') ||
               req.url.endsWith('.js') ||
+              req.url.endsWith('.css') ||
               req.url.endsWith('.vue')) {
             return req.url
           }
