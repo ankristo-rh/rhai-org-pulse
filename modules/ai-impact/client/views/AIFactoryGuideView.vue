@@ -8,6 +8,84 @@ const moduleNav = inject('moduleNav')
 const selectedPhase = ref(null)
 const labelsExpanded = ref(false)
 
+// Phase metadata for the rich overview cards
+const phaseInfo = {
+  'rfe-review': {
+    desc: 'Incoming requirements are ingested from Jira, assessed for quality, and scored against the rubric.',
+    color: 'blue',
+    tags: [
+      { label: 'AI Assessment', ai: true },
+      { label: 'Auto-Scoring', ai: true },
+      { label: 'Human Review', ai: false },
+    ],
+  },
+  'feature-review': {
+    desc: 'Strategy documents are auto-generated from approved RFEs, refined by AI, and reviewed by staff engineers.',
+    color: 'indigo',
+    tags: [
+      { label: 'AI Scoring', ai: true },
+      { label: 'Auto-Create', ai: true },
+      { label: 'Human Sign-off', ai: false },
+    ],
+  },
+  'implementation': {
+    desc: 'Engineering teams implement approved features across sprints with AI-assisted code generation.',
+    color: 'purple',
+    tags: [
+      { label: 'Code Generation', ai: true },
+      { label: 'Sprint Planning', ai: false },
+    ],
+  },
+  'qe-validation': {
+    desc: 'Automated and manual testing validates feature quality before release.',
+    color: 'cyan',
+    tags: [
+      { label: 'AI Test Gen', ai: true },
+      { label: 'Manual QE', ai: false },
+    ],
+  },
+  'security': {
+    desc: 'Security review and compliance checks before features ship.',
+    color: 'amber',
+    tags: [
+      { label: 'Vulnerability Scan', ai: true },
+      { label: 'Security Review', ai: false },
+    ],
+  },
+  'documentation': {
+    desc: 'User-facing documentation is generated and reviewed for each feature.',
+    color: 'teal',
+    tags: [
+      { label: 'AI Drafting', ai: true },
+      { label: 'Tech Writing', ai: false },
+    ],
+  },
+  'build-release': {
+    desc: 'Final build, integration testing, and release to production.',
+    color: 'rose',
+    tags: [
+      { label: 'CI/CD', ai: false },
+      { label: 'Release Gate', ai: false },
+    ],
+  },
+}
+
+// Color utility for phase accents
+const phaseColorMap = {
+  blue: { circle: 'bg-blue-500/20 border-blue-500', text: 'text-blue-400', tag: 'bg-blue-500/10 text-blue-400 border-blue-500/20', badge: 'bg-green-500/20 text-green-400', connector: 'from-blue-500 to-indigo-500' },
+  indigo: { circle: 'bg-indigo-500/20 border-indigo-500', text: 'text-indigo-400', tag: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', badge: 'bg-green-500/20 text-green-400', connector: 'from-indigo-500 to-purple-500' },
+  purple: { circle: 'bg-purple-500/20 border-purple-500', text: 'text-purple-400', tag: 'bg-purple-500/10 text-purple-400 border-purple-500/20', badge: 'bg-gray-500/20 text-gray-400', connector: 'from-purple-500 to-cyan-500' },
+  cyan: { circle: 'bg-cyan-500/20 border-cyan-500', text: 'text-cyan-400', tag: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20', badge: 'bg-gray-500/20 text-gray-400', connector: 'from-cyan-500 to-amber-500' },
+  amber: { circle: 'bg-amber-500/20 border-amber-500', text: 'text-amber-400', tag: 'bg-amber-500/10 text-amber-400 border-amber-500/20', badge: 'bg-gray-500/20 text-gray-400', connector: 'from-amber-500 to-teal-500' },
+  teal: { circle: 'bg-teal-500/20 border-teal-500', text: 'text-teal-400', tag: 'bg-teal-500/10 text-teal-400 border-teal-500/20', badge: 'bg-gray-500/20 text-gray-400', connector: 'from-teal-500 to-rose-500' },
+  rose: { circle: 'bg-rose-500/20 border-rose-500', text: 'text-rose-400', tag: 'bg-rose-500/10 text-rose-400 border-rose-500/20', badge: 'bg-gray-500/20 text-gray-400', connector: '' },
+}
+
+function getPhaseColors(phaseId) {
+  const info = phaseInfo[phaseId]
+  return info ? phaseColorMap[info.color] : phaseColorMap.blue
+}
+
 function selectPhase(phase) {
   selectedPhase.value = phase
 }
@@ -82,61 +160,79 @@ function labelColorClasses(color) {
 
     <!-- ─── Pipeline Overview ─── -->
     <div v-if="!selectedPhase" class="flex-1 overflow-auto p-6 lg:p-8">
-      <div class="max-w-4xl mx-auto">
+      <div class="max-w-3xl mx-auto">
         <!-- Header -->
         <div class="mb-8">
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">AI Factory Guide</h1>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">AI Factory Guide</h1>
           <p class="text-sm text-gray-500 dark:text-gray-400 max-w-2xl">
-            How the RHAI delivery pipeline works — from RFE to release. Click any stage to learn what happens, what you need to do, and how to use the tools.
+            Understand the end-to-end AI-augmented delivery pipeline. Click any stage to explore its details.
           </p>
         </div>
 
-        <!-- Pipeline stages -->
-        <div class="space-y-3">
-          <button
-            v-for="phase in PHASES"
-            :key="phase.id"
-            @click="selectPhase(phase)"
-            class="w-full group"
-          >
-            <div
-              class="flex items-center gap-4 p-5 rounded-xl border transition-all duration-200"
-              :class="phase.status === 'active'
-                ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md'
-                : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700/50 hover:border-gray-200 dark:hover:border-gray-600'"
+        <!-- Pipeline stages — vertical spine -->
+        <div class="relative">
+          <!-- Gradient spine -->
+          <div class="absolute left-[19px] top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 via-cyan-500 via-amber-500 to-rose-500 opacity-30 dark:opacity-30"></div>
+
+          <template v-for="(phase, idx) in PHASES" :key="phase.id">
+            <!-- Stage card -->
+            <button
+              @click="selectPhase(phase)"
+              class="relative flex items-start gap-5 pl-0 w-full text-left group"
             >
-              <!-- Phase number -->
+              <!-- Circle on spine -->
               <div
-                class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
-                :class="phase.status === 'active'
-                  ? 'bg-blue-500/10 border-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500'"
+                class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 z-10 border-2"
+                :class="getPhaseColors(phase.id).circle"
               >
-                {{ phase.order }}
+                <span class="text-sm font-bold" :class="getPhaseColors(phase.id).text">{{ phase.order }}</span>
               </div>
 
-              <!-- Phase info -->
-              <div class="flex-1 text-left">
-                <div class="flex items-center gap-2">
+              <!-- Card -->
+              <div
+                class="flex-1 rounded-xl p-5 mb-1 border transition-all duration-200"
+                :class="phase.status === 'active'
+                  ? 'bg-white dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 group-hover:border-blue-300 dark:group-hover:border-blue-600/60 group-hover:shadow-md dark:group-hover:shadow-blue-500/5'
+                  : 'bg-gray-50 dark:bg-gray-800/30 border-gray-100 dark:border-gray-700/50 group-hover:border-gray-200 dark:group-hover:border-gray-600'"
+              >
+                <div class="flex items-center justify-between mb-1.5">
+                  <h3
+                    class="text-base font-semibold"
+                    :class="phase.status === 'active' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'"
+                  >{{ phase.name }}</h3>
                   <span
-                    class="text-sm font-semibold"
-                    :class="phase.status === 'active' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'"
-                  >{{ phase.name }}</span>
+                    class="px-2 py-0.5 text-xs rounded-full font-medium"
+                    :class="phase.status === 'active'
+                      ? 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-400'
+                      : 'bg-gray-100 dark:bg-gray-500/20 text-gray-400 dark:text-gray-500'"
+                  >{{ phase.status === 'active' ? 'Active' : 'Coming Soon' }}</span>
+                </div>
+                <p
+                  v-if="phaseInfo[phase.id]"
+                  class="text-sm mb-3"
+                  :class="phase.status === 'active' ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'"
+                >{{ phaseInfo[phase.id].desc }}</p>
+                <div v-if="phaseInfo[phase.id]" class="flex gap-2 flex-wrap">
                   <span
-                    v-if="phase.status === 'coming-soon'"
-                    class="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500"
-                  >Coming soon</span>
+                    v-for="tag in phaseInfo[phase.id].tags"
+                    :key="tag.label"
+                    class="px-2 py-0.5 text-xs rounded border"
+                    :class="tag.ai
+                      ? getPhaseColors(phase.id).tag
+                      : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-600'"
+                  >{{ tag.label }}</span>
                 </div>
               </div>
+            </button>
 
-              <!-- Arrow -->
-              <ChevronRight
-                :size="18"
-                class="flex-shrink-0 transition-transform group-hover:translate-x-0.5"
-                :class="phase.status === 'active' ? 'text-gray-400 dark:text-gray-500' : 'text-gray-300 dark:text-gray-600'"
-              />
-            </div>
-          </button>
+            <!-- Connector between cards -->
+            <div
+              v-if="idx < PHASES.length - 1"
+              class="w-0.5 h-5 mx-auto opacity-40 bg-gradient-to-b"
+              :class="getPhaseColors(phase.id).connector"
+              style="margin-left: 19px;"
+            ></div>
+          </template>
         </div>
       </div>
     </div>
