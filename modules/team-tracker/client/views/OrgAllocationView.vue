@@ -82,9 +82,9 @@ function teamBuckets(team) {
 
 watch(selectedOrg, fetchSummary)
 
-onMounted(async () => {
-  await loadOrgs()
-  await fetchSummary()
+onMounted(() => {
+  loadOrgs()
+  fetchSummary()
 })
 </script>
 

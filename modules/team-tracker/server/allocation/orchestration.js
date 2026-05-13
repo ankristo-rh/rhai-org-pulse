@@ -1,15 +1,4 @@
-/**
- * Orchestration logic for allocation sprint refresh.
- *
- * Adapted from allocation-tracker to use team-store teams instead of
- * project-based config. All I/O is injected via dependencies.
- *
- * Key changes from allocation-tracker:
- * - Teams come from team-store (each has boards with boardId, sprintFilter)
- * - allocationMode from team metadata replaces per-board calculationMode
- * - Storage is flat under allocation/ prefix (no multi-project namespacing)
- * - Summaries are per-team, per-org, and global (no per-project level)
- */
+/** Orchestration logic for allocation sprint refresh. */
 
 const { classifyIssue, buildSprintSummary, buildTeamSummary, buildOrgSummary } = require('./classification');
 

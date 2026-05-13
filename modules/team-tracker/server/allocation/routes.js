@@ -39,6 +39,33 @@ module.exports = function registerAllocationRoutes(router, context) {
 
   // ─── Refresh routes ───
 
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/refresh:
+   *   post:
+   *     tags: ['Allocation']
+   *     summary: Trigger allocation data refresh from Jira
+   *     security: [{ admin: [] }]
+   *     parameters:
+   *       - in: query
+   *         name: teamId
+   *         schema:
+   *           type: string
+   *         description: Refresh a single team (optional)
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               teamId:
+   *                 type: string
+   *               hardRefresh:
+   *                 type: boolean
+   *     responses:
+   *       200:
+   *         description: Refresh status
+   */
   router.post('/allocation/refresh', requireAdmin, async function(req, res) {
     if (DEMO_MODE) {
       return res.json({ status: 'skipped', message: 'Refresh disabled in demo mode' });
@@ -124,6 +151,16 @@ module.exports = function registerAllocationRoutes(router, context) {
     });
   });
 
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/refresh/status:
+   *   get:
+   *     tags: ['Allocation']
+   *     summary: Get allocation refresh status
+   *     responses:
+   *       200:
+   *         description: Current refresh state
+   */
   router.get('/allocation/refresh/status', function(_req, res) {
     const sanitized = { ...refreshState };
     if (sanitized.lastResult) {
@@ -139,6 +176,22 @@ module.exports = function registerAllocationRoutes(router, context) {
 
   // ─── Summary routes ───
 
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/team/{teamId}/summary:
+   *   get:
+   *     tags: ['Allocation']
+   *     summary: Get allocation summary for a team
+   *     parameters:
+   *       - in: path
+   *         name: teamId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Team allocation summary
+   */
   router.get('/allocation/team/:teamId/summary', function(req, res) {
     try {
       const { teamId } = req.params;
@@ -153,6 +206,22 @@ module.exports = function registerAllocationRoutes(router, context) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/org/{orgKey}/summary:
+   *   get:
+   *     tags: ['Allocation']
+   *     summary: Get allocation summary for an org
+   *     parameters:
+   *       - in: path
+   *         name: orgKey
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Org allocation summary
+   */
   router.get('/allocation/org/:orgKey/summary', function(req, res) {
     try {
       const orgParam = req.params.orgKey;
@@ -176,6 +245,16 @@ module.exports = function registerAllocationRoutes(router, context) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/global/summary:
+   *   get:
+   *     tags: ['Allocation']
+   *     summary: Get global allocation summary across all orgs
+   *     responses:
+   *       200:
+   *         description: Global allocation summary
+   */
   router.get('/allocation/global/summary', function(_req, res) {
     try {
       const data = allocRead('summaries/global.json');
@@ -191,6 +270,27 @@ module.exports = function registerAllocationRoutes(router, context) {
 
   // ─── Sprint data routes ───
 
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/board/{boardId}/sprints:
+   *   get:
+   *     tags: ['Allocation']
+   *     summary: Get sprint list for a board
+   *     parameters:
+   *       - in: path
+   *         name: boardId
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: query
+   *         name: sprintFilter
+   *         schema:
+   *           type: string
+   *         description: Filter sprints by name
+   *     responses:
+   *       200:
+   *         description: Board sprint index
+   */
   router.get('/allocation/board/:boardId/sprints', function(req, res) {
     try {
       const { boardId } = req.params;
@@ -201,7 +301,7 @@ module.exports = function registerAllocationRoutes(router, context) {
       // If sprintFilter query param, try filter-specific index first
       const sprintFilter = req.query.sprintFilter;
       if (sprintFilter) {
-        const filterKey = sprintFilter.trim().toLowerCase().replace(/\s+/g, '-');
+        const filterKey = sprintFilter.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         const filtered = allocRead(`sprints/board-${boardId}-${filterKey}.json`);
         if (filtered) return res.json(filtered);
       }
@@ -217,6 +317,24 @@ module.exports = function registerAllocationRoutes(router, context) {
     }
   });
 
+  /**
+   * @openapi
+   * /api/modules/team-tracker/allocation/sprints/{sprintId}/issues:
+   *   get:
+   *     tags: ['Allocation']
+   *     summary: Get classified issues for a sprint
+   *     parameters:
+   *       - in: path
+   *         name: sprintId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Sprint issue data with classification
+   *       404:
+   *         description: Sprint data not found
+   */
   router.get('/allocation/sprints/:sprintId/issues', function(req, res) {
     try {
       const { sprintId } = req.params;
