@@ -30,7 +30,20 @@ function createRoleStore(readFromStorage, writeToStorage) {
     if (!isSafeKey(key)) return [];
     const data = readRoles();
     const entry = data.assignments[key];
-    return entry ? entry.roles : [];
+    if (entry) return entry.roles;
+
+    // Fallback: match by local part when email domain differs
+    // (e.g. user@cluster.local vs user@redhat.com from LDAP)
+    const localPart = key.split('@')[0];
+    if (localPart) {
+      for (const [assignedEmail, assignment] of Object.entries(data.assignments)) {
+        if (assignedEmail.split('@')[0] === localPart) {
+          return assignment.roles;
+        }
+      }
+    }
+
+    return [];
   }
 
   function hasRole(email, role) {
