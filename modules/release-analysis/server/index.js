@@ -1307,6 +1307,9 @@ module.exports = function registerRoutes(router, context) {
    *         description: Admin required
    */
   router.post('/quality/refresh', requireAdmin, async function(req, res) {
+    if (DEMO_MODE) {
+      return res.json({ status: 'skipped', message: 'Refresh disabled in demo mode' })
+    }
     try {
       const versions = await fetchQualityVersions(QUALITY_PROJECTS)
       writeToStorage('release-analysis/quality/versions.json', versions)
