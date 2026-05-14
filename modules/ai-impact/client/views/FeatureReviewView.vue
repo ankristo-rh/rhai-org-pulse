@@ -49,6 +49,10 @@ function handleNavigateToRFE(rfeKey) {
   moduleNav.navigateTo('rfe-review', { select: rfeKey })
 }
 
+function handleNavigateToTestPlan(sourceKey) {
+  moduleNav.navigateTo('test-plan-review', { select: sourceKey })
+}
+
 // Handle incoming select param (cross-link from RFE Review)
 watch(() => moduleNav.params.value, (params) => {
   if (params?.select && Object.keys(features.value).length > 0) {
@@ -106,6 +110,7 @@ watch(() => Object.keys(features.value).length, () => {
       :loadFeatureDetail="loadFeatureDetail"
       @close="handleCloseModal"
       @navigateToRFE="handleNavigateToRFE"
+      @navigateToTestPlan="handleNavigateToTestPlan"
     />
 
     <AIImpactGuide />

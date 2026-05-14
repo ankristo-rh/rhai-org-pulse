@@ -83,6 +83,11 @@ function getRFEPhaseSignal(phaseId) {
         }
       }
       return { completed: false, current: false, aiUsed: null, detail: 'No linked feature' }
+    case 'test-plan-review':
+      if (props.testPlan) {
+        return getTestPlanPhaseSignal()
+      }
+      return { completed: false, current: false, aiUsed: null, detail: 'No signals yet' }
     case 'build-release':
       if (rfe.linkedFeature?.fixVersions?.length > 0) {
         return {

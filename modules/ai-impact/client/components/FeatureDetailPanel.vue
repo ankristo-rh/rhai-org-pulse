@@ -2,6 +2,7 @@
 import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import PipelineTimeline from './PipelineTimeline.vue'
 import { getRecommendationClass, getRecommendationLabel, getRecommendationTooltip, getScoreClass, getReviewStatusClass, getReviewStatusLabel, getReviewStatusTooltip } from '../utils/feature-helpers.js'
+import { useTestPlans } from '../composables/useTestPlans.js'
 import InfoBubble from './InfoBubble.vue'
 
 const props = defineProps({
@@ -12,21 +13,27 @@ const props = defineProps({
   loadFeatureDetail: { type: Function, default: null }
 })
 
-const emit = defineEmits(['close', 'navigateToRFE'])
+const emit = defineEmits(['close', 'navigateToRFE', 'navigateToTestPlan'])
 
 const featureDetail = ref(null)
 const detailLoading = ref(false)
 const modalRef = ref(null)
 let previousActiveElement = null
 
+const { loadTestPlanDetail } = useTestPlans()
+const testPlanData = ref(null)
+
 watch(
   () => props.feature?.key,
   async (key) => {
     featureDetail.value = null
+    testPlanData.value = null
     if (!props.show || !key || !props.loadFeatureDetail) return
     detailLoading.value = true
     try {
       featureDetail.value = await props.loadFeatureDetail(key)
+      // Load test plan data for this feature (sourceKey matches feature.key)
+      testPlanData.value = await loadTestPlanDetail(key)
     } catch {
       // Silently fail - slim data still shows
     } finally {
@@ -264,7 +271,7 @@ const history = computed(() => featureDetail.value?.history || [])
             <div v-if="detailLoading" class="text-xs text-gray-400 dark:text-gray-500 mb-4">Loading details...</div>
 
             <!-- Pipeline Progress -->
-            <PipelineTimeline :feature="featureDetail?.latest || feature" :phases="phases" :jiraHost="jiraHost" @navigateToRFE="emit('navigateToRFE', $event)" />
+            <PipelineTimeline :feature="featureDetail?.latest || feature" :testPlan="testPlanData?.latest" :phases="phases" :jiraHost="jiraHost" @navigateToRFE="emit('navigateToRFE', $event)" @navigateToTestPlan="emit('navigateToTestPlan', $event)" />
           </div>
         </div>
       </div>

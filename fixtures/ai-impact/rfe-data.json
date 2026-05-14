@@ -12,9 +12,9 @@
       "labels": ["rfe-creator-auto-created", "rfe-creator-auto-revised", "customer-request"],
       "aiInvolvement": "both",
       "linkedFeature": {
-        "key": "RHAISTRAT-501",
-        "summary": "Strat: Model serving autoscaling",
-        "status": "In Progress",
+        "key": "RHAISTRAT-1168",
+        "summary": "GPU-as-a-Service Observability Dashboard",
+        "status": "Refined",
         "fixVersions": ["RHOAI 2.16"]
       }
     },

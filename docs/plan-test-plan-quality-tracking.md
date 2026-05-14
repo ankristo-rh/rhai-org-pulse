@@ -83,7 +83,13 @@ The detail panel (`TestPlanDetailPanel.vue`) was deliberately designed to mirror
 
 ### Gap Analysis Section
 
-The `gapAnalysis` field is a distinct section from `feedback`. It contains a structured analysis of what the test plan is missing relative to the source feature's requirements. 
+The `gapAnalysis` field is a distinct section from `feedback`. It contains a structured analysis of what the test plan is missing relative to the source feature's requirements, organized into collapsible sections (Scope & Endpoints, Test Strategy & Risks, Environment & Infrastructure).
+
+Rendered by the dedicated `GapAnalysisText.vue` component with proper dashboard styling:
+- Section headers are clickable with chevron icons (▶/▼) and count badges showing number of gaps per section
+- All sections start collapsed for progressive disclosure
+- Smooth expand/collapse transitions with hover effects
+- Parses markdown headers (`## Title`) and bullet points with inline bold (`**text**`)
 
 It only renders when there is actual gap content (`v-if="currentPlan?.gapAnalysis"`), so plans with no identified gaps simply omit the section entirely.
 
@@ -227,7 +233,8 @@ Mirrors `FeatureReviewView.vue`. Uses `useTestPlans()`, `useAIImpact()` (for `ji
 | `TestPlanCharts.vue`        | Score Distribution histogram (0-10, red/amber/green) + Dimension Breakdown stacked bar (Pass/Partial/Fail per criterion). Dark mode via MutationObserver.                                                                                                                                                                |
 | `TestPlanList.vue`          | Search (key/feature/component), verdict filter ("All AI Recommendations" / "AI Recommendation: Ready/Revise/Rework"), sort (default/score low-high/high-low)                                                                                                                                                             |
 | `TestPlanListItem.vue`      | Source key, feature name, verdict badge, score, components, auto-revised indicator                                                                                                                                                                                                                                       |
-| `TestPlanDetailPanel.vue`   | Full detail modal: header, AI recommendation + review status + score, approval info, source strategy link, dimension scores (2-col grid with expandable criterion notes), score history (includes current entry), feedback, gap analysis, auto-revised indicator, labels, components, related reviews, pipeline progress |
+| `TestPlanDetailPanel.vue`   | Full detail modal: header, AI recommendation + review status + score, approval info, source strategy link, dimension scores (2-col grid with expandable criterion notes), score history (includes current entry), feedback, collapsible gap analysis (GapAnalysisText), auto-revised indicator, labels, components, related reviews, pipeline progress |
+| `GapAnalysisText.vue`       | Collapsible gap analysis renderer with section headers (chevron icons, count badges), bullet points with inline bold, smooth expand/collapse transitions                                                                                                                                                                 |
 
 
 ### Existing Component Updates
@@ -235,7 +242,9 @@ Mirrors `FeatureReviewView.vue`. Uses `useTestPlans()`, `useAIImpact()` (for `ji
 
 | Component                  | Change                                                                                                                                                                                                                                                    |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PipelineTimeline.vue`     | Added `testPlan` prop for test-plan-only context. Shows verdict + score in QE step. Green checkmark if human-approved, blue circle if reviewed but awaiting approval. Clickable link emits `navigateToTestPlan`.                                          |
+| `PipelineTimeline.vue`     | Added `testPlan` prop for test-plan-only context. Shows verdict + score in test-plan-review phase. Green checkmark if human-approved, blue circle if awaiting approval. Clickable link emits `navigateToTestPlan`. Added `test-plan-review` case to `getRFEPhaseSignal()` for RFE context. |
+| `FeatureDetailPanel.vue`   | Loads test plan data for feature.key, passes to PipelineTimeline, emits `navigateToTestPlan` for timeline clicks.                                                                                                                                         |
+| `RFEDetailModal.vue`       | Loads test plan data for rfe.linkedFeature.key, passes to PipelineTimeline, emits `navigateToTestPlan` for timeline clicks.                                                                                                                               |
 | `AssessmentGuideModal.vue` | Added "Test Plan Review" tab: workflow diagram (Strategy Input → AI Analysis → Quality Review → Test Cases), scoring criteria table, verdict outcomes, CLI tool references (`/test-plan-create`, `/test-plan-create-cases`, `/test-plan-case-implement`). |
 | `AIImpactSettings.vue`     | Added test plan data section: status display (`lastSyncedAt`, `totalTestPlans`, `totalHistoryEntries`), clear button.                                                                                                                                     |
 
@@ -299,7 +308,7 @@ The pipeline timeline in the UI can show green/amber/red per stage by checking l
 
 ## Tests
 
-4 test files, 79 test cases, all passing (173 files, 2785 tests total across the project):
+5 test files, 84 test cases, all passing:
 
 
 | Test file                      | Cases | Coverage                                                                                                                                                                           |
@@ -308,6 +317,7 @@ The pipeline timeline in the UI can show green/amber/red per stage by checking l
 | `test-plan-storage.test.js`    | 16    | Read/write, upsert, idempotency, history management, trimming, slim projections, atomic writes                                                                                     |
 | `test-plan-routes.test.js`     | 13    | All 8 routes, auth guards, demo mode guards, bulk size limits, sync trigger/status                                                                                                 |
 | `test-plan-jira-sync.test.js`  | 17    | Label extraction, changelog parsing for approval dates/actors, error handling, partial sync failures                                                                               |
+| `gap-analysis-text.test.js`    | 5     | Section parsing, collapsible behavior, expand/collapse, count badges, chevron rotation                                                                                             |
 
 
 ---
@@ -330,7 +340,7 @@ Manual E2E checklist: `docs/e2e-test-plan-quality.md`
 
 ## Files Summary
 
-**New files (21 in rhai-org-pulse):**
+**New files (23 in rhai-org-pulse):**
 
 
 | #   | Path                                                              |
@@ -348,28 +358,35 @@ Manual E2E checklist: `docs/e2e-test-plan-quality.md`
 | 11  | `modules/ai-impact/client/components/TestPlanDetailPanel.vue`     |
 | 12  | `modules/ai-impact/client/components/TestPlanMetricsRow.vue`      |
 | 13  | `modules/ai-impact/client/components/TestPlanCharts.vue`          |
-| 14  | `modules/ai-impact/__tests__/server/test-plan-validation.test.js` |
-| 15  | `modules/ai-impact/__tests__/server/test-plan-storage.test.js`    |
-| 16  | `modules/ai-impact/__tests__/server/test-plan-routes.test.js`     |
-| 17  | `modules/ai-impact/__tests__/server/test-plan-jira-sync.test.js`  |
-| 18  | `fixtures/ai-impact/test-plans.json`                              |
-| 19  | `docs/plan-test-plan-quality-tracking.md`                         |
-| 20  | `docs/e2e-test-plan-quality.md`                                   |
-| 21  | `docs/e2e-test-plan-quality.sh`                                   |
+| 14  | `modules/ai-impact/client/components/GapAnalysisText.vue`         |
+| 15  | `modules/ai-impact/__tests__/server/test-plan-validation.test.js` |
+| 16  | `modules/ai-impact/__tests__/server/test-plan-storage.test.js`    |
+| 17  | `modules/ai-impact/__tests__/server/test-plan-routes.test.js`     |
+| 18  | `modules/ai-impact/__tests__/server/test-plan-jira-sync.test.js`  |
+| 19  | `modules/ai-impact/__tests__/client/gap-analysis-text.test.js`    |
+| 20  | `fixtures/ai-impact/test-plans.json`                              |
+| 21  | `docs/plan-test-plan-quality-tracking.md`                         |
+| 22  | `docs/e2e-test-plan-quality.md`                                   |
+| 23  | `docs/e2e-test-plan-quality.sh`                                   |
 
 
-**Modified files (7 in rhai-org-pulse):**
+**Modified files (12 in rhai-org-pulse):**
 
 
-| #   | Path                                                           | Change                                                                     |
-| --- | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1   | `modules/ai-impact/server/index.js`                            | +3 lines: import + register test plan routes                               |
-| 2   | `modules/ai-impact/module.json`                                | Nav item: disabled `qe-validation` placeholder → active `test-plan-review` |
-| 3   | `modules/ai-impact/client/index.js`                            | Route mapping for `test-plan-review`                                       |
-| 4   | `modules/ai-impact/client/constants.js`                        | Phase entry: `test-plan-review`, order 4, active                           |
-| 5   | `modules/ai-impact/client/components/AIImpactSettings.vue`     | Test plan data status section + clear button                               |
-| 6   | `modules/ai-impact/client/components/PipelineTimeline.vue`     | `testPlan` prop, test-plan-only context signals                            |
-| 7   | `modules/ai-impact/client/components/AssessmentGuideModal.vue` | "Test Plan Review" tab                                                     |
+| #   | Path                                                           | Change                                                                                   |
+| --- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 1   | `modules/ai-impact/server/index.js`                            | +3 lines: import + register test plan routes                                             |
+| 2   | `modules/ai-impact/module.json`                                | Nav item: disabled `qe-validation` placeholder → active `test-plan-review`               |
+| 3   | `modules/ai-impact/client/index.js`                            | Route mapping for `test-plan-review`                                                     |
+| 4   | `modules/ai-impact/client/constants.js`                        | Phase entry: `test-plan-review`, order 4, active                                         |
+| 5   | `modules/ai-impact/client/components/AIImpactSettings.vue`     | Test plan data status section + clear button                                             |
+| 6   | `modules/ai-impact/client/components/PipelineTimeline.vue`     | `testPlan` prop, test-plan-only context signals, RFE test-plan-review case               |
+| 7   | `modules/ai-impact/client/components/AssessmentGuideModal.vue` | "Test Plan Review" tab                                                                   |
+| 8   | `modules/ai-impact/client/components/FeatureDetailPanel.vue`   | Test plan loading, pass to PipelineTimeline, navigateToTestPlan handler                  |
+| 9   | `modules/ai-impact/client/components/RFEDetailModal.vue`       | Test plan loading via linkedFeature.key, pass to PipelineTimeline, navigateToTestPlan    |
+| 10  | `modules/ai-impact/client/views/FeatureReviewView.vue`         | handleNavigateToTestPlan handler                                                         |
+| 11  | `modules/ai-impact/client/views/RFEReviewView.vue`             | handleNavigateToTestPlan handler                                                         |
+| 12  | `fixtures/ai-impact/rfe-data.json`                             | RHAIRFE-1001 linkedFeature updated to RHAISTRAT-1168 (matches feature/test plan fixture) |
 
 
 **Modified files (1 in odh-test-gen):**
@@ -460,13 +477,18 @@ This makes rfe-assessor the single CI hub for all three AI Impact data types:
 
 ### 3. Pipeline Timeline Wiring from Parent Views
 
-The `testPlan` prop on `PipelineTimeline.vue` is defined and functional (shows verdict, score, approval status, clickable navigation), but not yet wired from the RFE Detail or Feature Detail parent views. Those views need to:
+**Status**: ✅ **COMPLETE**
 
-1. Import `useTestPlans()` composable
-2. Call `loadTestPlanDetail(sourceKey)` when opening a detail panel
-3. Pass the result as `:testPlan="testPlanData"` to `PipelineTimeline`
+The `testPlan` prop on `PipelineTimeline.vue` is now fully wired from both RFE Detail and Feature Detail parent views. Test plan data appears in the pipeline timeline with verdict, score, human approval status, and clickable navigation to Test Plan Detail.
 
-This creates a cross-cutting data dependency — the Feature Detail panel would need to know about test plans. The cleanest approach may be a shared composable that loads all pipeline stage data for a given source key.
+**Implementation**:
+- **FeatureDetailPanel.vue**: Imports `useTestPlans()`, loads test plan for `feature.key` when panel opens, passes `:testPlan="testPlanData?.latest"` to PipelineTimeline
+- **RFEDetailModal.vue**: Imports `useTestPlans()`, loads test plan for `rfe.linkedFeature.key` when panel opens, passes `:testPlan="testPlanData?.latest"` to PipelineTimeline
+- **PipelineTimeline.vue**: Added `test-plan-review` case to `getRFEPhaseSignal()` to display test plan data when viewing RFE
+- **Navigation handlers**: Both parent views emit `@navigateToTestPlan` events that route to `test-plan-review` view with select param
+- **Fixture alignment**: Updated `rfe-data.json` to link RHAIRFE-1001 → RHAISTRAT-1168 (matching existing feature and test plan data)
+
+**Result**: Complete bidirectional cross-linking across all three pipeline stages (RFE ↔ Feature ↔ Test Plan).
 
 ### 4. Multiple Plans Per Key
 

@@ -4,6 +4,7 @@ import PipelineTimeline from './PipelineTimeline.vue'
 import AssessmentBreakdown from './AssessmentBreakdown.vue'
 import AssessmentHistory from './AssessmentHistory.vue'
 import FeedbackText from './FeedbackText.vue'
+import { useTestPlans } from '../composables/useTestPlans.js'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -14,21 +15,29 @@ const props = defineProps({
   loadAssessmentDetail: { type: Function, default: null }
 })
 
-const emit = defineEmits(['close', 'navigateToFeature'])
+const emit = defineEmits(['close', 'navigateToFeature', 'navigateToTestPlan'])
 
 const assessmentDetail = ref(null)
 const detailLoading = ref(false)
 const modalRef = ref(null)
 let previousActiveElement = null
 
+const { loadTestPlanDetail } = useTestPlans()
+const testPlanData = ref(null)
+
 watch(
   () => props.rfe?.key,
   async (key) => {
     assessmentDetail.value = null
+    testPlanData.value = null
     if (!props.show || !key || !props.assessment || !props.loadAssessmentDetail) return
     detailLoading.value = true
     try {
       assessmentDetail.value = await props.loadAssessmentDetail(key)
+      // Load test plan for the linked feature (if exists)
+      if (props.rfe?.linkedFeature?.key) {
+        testPlanData.value = await loadTestPlanDetail(props.rfe.linkedFeature.key)
+      }
     } catch {
       // Silently fail - slim data still shows
     } finally {
@@ -209,7 +218,7 @@ function getInvolvementClass(involvement) {
               </div>
             </div>
 
-            <PipelineTimeline :rfe="rfe" :phases="phases" :jiraHost="jiraHost" @navigateToFeature="emit('navigateToFeature', $event)" />
+            <PipelineTimeline :rfe="rfe" :testPlan="testPlanData?.latest" :phases="phases" :jiraHost="jiraHost" @navigateToFeature="emit('navigateToFeature', $event)" @navigateToTestPlan="emit('navigateToTestPlan', $event)" />
           </div>
         </div>
       </div>
