@@ -12,7 +12,7 @@ function isValidSprintId(id) { return /^(\d+|kanban-\d+)$/.test(id); }
 const REFRESH_COOLDOWN_MS = 60_000;
 
 module.exports = function registerAllocationRoutes(router, context) {
-  const { storage, requireAdmin } = context;
+  const { storage, requireAdmin, requireScope } = context;
   const { readFromStorage, writeToStorage } = storage;
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
@@ -66,7 +66,7 @@ module.exports = function registerAllocationRoutes(router, context) {
    *       200:
    *         description: Refresh status
    */
-  router.post('/allocation/refresh', requireAdmin, async function(req, res) {
+  router.post('/allocation/refresh', requireAdmin, requireScope('metrics:write'), async function(req, res) {
     if (DEMO_MODE) {
       return res.json({ status: 'skipped', message: 'Refresh disabled in demo mode' });
     }
@@ -161,7 +161,7 @@ module.exports = function registerAllocationRoutes(router, context) {
    *       200:
    *         description: Current refresh state
    */
-  router.get('/allocation/refresh/status', function(_req, res) {
+  router.get('/allocation/refresh/status', requireScope('metrics:read'), function(_req, res) {
     const sanitized = { ...refreshState };
     if (sanitized.lastResult) {
       sanitized.lastResult = {
@@ -192,7 +192,7 @@ module.exports = function registerAllocationRoutes(router, context) {
    *       200:
    *         description: Team allocation summary
    */
-  router.get('/allocation/team/:teamId/summary', function(req, res) {
+  router.get('/allocation/team/:teamId/summary', requireScope('metrics:read'), function(req, res) {
     try {
       const { teamId } = req.params;
       const data = allocRead(`summaries/team-${teamId}.json`);
@@ -222,7 +222,7 @@ module.exports = function registerAllocationRoutes(router, context) {
    *       200:
    *         description: Org allocation summary
    */
-  router.get('/allocation/org/:orgKey/summary', function(req, res) {
+  router.get('/allocation/org/:orgKey/summary', requireScope('metrics:read'), function(req, res) {
     try {
       const orgParam = req.params.orgKey;
       // Try direct lookup first (orgParam is already an orgKey)
@@ -255,7 +255,7 @@ module.exports = function registerAllocationRoutes(router, context) {
    *       200:
    *         description: Global allocation summary
    */
-  router.get('/allocation/global/summary', function(_req, res) {
+  router.get('/allocation/global/summary', requireScope('metrics:read'), function(_req, res) {
     try {
       const data = allocRead('summaries/global.json');
       if (!data) {
@@ -291,7 +291,7 @@ module.exports = function registerAllocationRoutes(router, context) {
    *       200:
    *         description: Board sprint index
    */
-  router.get('/allocation/board/:boardId/sprints', function(req, res) {
+  router.get('/allocation/board/:boardId/sprints', requireScope('metrics:read'), function(req, res) {
     try {
       const { boardId } = req.params;
       if (!isValidBoardId(boardId)) {
@@ -335,7 +335,7 @@ module.exports = function registerAllocationRoutes(router, context) {
    *       404:
    *         description: Sprint data not found
    */
-  router.get('/allocation/sprints/:sprintId/issues', function(req, res) {
+  router.get('/allocation/sprints/:sprintId/issues', requireScope('metrics:read'), function(req, res) {
     try {
       const { sprintId } = req.params;
       if (!isValidSprintId(sprintId)) {

@@ -77,7 +77,7 @@ describe('conforma backend routes', () => {
 
     // Register routes
     const registerConformaRoutes = require('../../server/conforma.js')
-    registerConformaRoutes(router, { storage, requireAuth, requireAdmin })
+    registerConformaRoutes(router, { storage, requireAuth, requireAdmin, requireScope: () => (req, res, next) => next() })
   })
 
   describe('GET /conforma/status', () => {
@@ -211,7 +211,7 @@ describe('conforma backend routes — demo mode', () => {
     const mock = makeRouter()
     router = mock.router
     const registerConformaRoutes = require('../../server/conforma.js')
-    registerConformaRoutes(router, { storage, requireAuth, requireAdmin })
+    registerConformaRoutes(router, { storage, requireAuth, requireAdmin, requireScope: () => (req, res, next) => next() })
   })
 
   afterEach(() => {

@@ -734,6 +734,7 @@ Stores hashed API tokens for bearer-token authentication. Created on first token
       "tokenHash": "sha256-hex-of-full-token",
       "tokenPrefix": "tt_a1b2c3d4",
       "ownerEmail": "user@redhat.com",
+      "scopes": ["roster:read", "metrics:read"],
       "createdAt": "2026-04-03T12:00:00Z",
       "expiresAt": "2026-07-03T12:00:00Z",
       "lastUsedAt": "2026-04-03T14:30:00Z"
@@ -745,6 +746,7 @@ Stores hashed API tokens for bearer-token authentication. Created on first token
 **Notes:**
 - Raw tokens are never stored — only SHA-256 hashes.
 - `tokenPrefix` stores the first 11 characters (e.g., `tt_a1b2c3d4`) for identification.
+- `scopes` controls which API endpoints the token can access. Values: an array of scope strings (e.g., `["roster:read", "metrics:write"]`), `["*"]` for wildcard full access, `[]` for no access (except `tokens:manage`), or `null` for legacy full access. Legacy tokens without a `scopes` field are treated as `null` (full access). `tokens:manage` is always implicitly granted.
 - `expiresAt` is `null` for non-expiring tokens.
 - `lastUsedAt` is `null` until first use, then updated (throttled to once per 60 seconds).
 

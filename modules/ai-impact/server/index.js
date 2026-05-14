@@ -1,5 +1,5 @@
 module.exports = function registerRoutes(router, context) {
-  const { storage, requireAdmin } = context;
+  const { storage, requireAdmin, requireScope } = context;
   const { readFromStorage, writeToStorage } = storage;
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
@@ -34,7 +34,7 @@ module.exports = function registerRoutes(router, context) {
 
   const VALID_TIME_WINDOWS = ['week', 'month', '3months'];
 
-  router.get('/rfe-data', function(req, res) {
+  router.get('/rfe-data', requireScope('ai-impact:read'), function(req, res) {
     const timeWindow = VALID_TIME_WINDOWS.includes(req.query.timeWindow)
       ? req.query.timeWindow
       : 'month';
@@ -69,7 +69,7 @@ module.exports = function registerRoutes(router, context) {
 
   const VALID_AUTOFIX_TIME_WINDOWS = ['week', 'month', '3months'];
 
-  router.get('/autofix-data', function(req, res) {
+  router.get('/autofix-data', requireScope('ai-impact:read'), function(req, res) {
     const timeWindow = VALID_AUTOFIX_TIME_WINDOWS.includes(req.query.timeWindow)
       ? req.query.timeWindow
       : 'month';
@@ -130,7 +130,7 @@ module.exports = function registerRoutes(router, context) {
     };
   }
 
-  router.get('/doc-data', function(req, res) {
+  router.get('/doc-data', requireScope('ai-impact:read'), function(req, res) {
     const rawData = readFromStorage('ai-impact/doc-data.json');
     if (!rawData || !rawData.issues) {
       return res.json({
@@ -158,11 +158,11 @@ module.exports = function registerRoutes(router, context) {
     });
   });
 
-  router.get('/config', requireAdmin, function(req, res) {
+  router.get('/config', requireAdmin, requireScope('ai-impact:write'), function(req, res) {
     res.json(getConfig(readFromStorage));
   });
 
-  router.post('/config', requireAdmin, function(req, res) {
+  router.post('/config', requireAdmin, requireScope('ai-impact:write'), function(req, res) {
     try {
       saveConfig(writeToStorage, req.body);
       res.json({ status: 'saved' });
@@ -171,18 +171,18 @@ module.exports = function registerRoutes(router, context) {
     }
   });
 
-  router.delete('/cache', requireAdmin, function(req, res) {
+  router.delete('/cache', requireAdmin, requireScope('ai-impact:write'), function(req, res) {
     writeToStorage('ai-impact/rfe-data.json', null);
     writeToStorage('ai-impact/autofix-data.json', null);
     writeToStorage('ai-impact/doc-data.json', null);
     res.json({ status: 'cleared' });
   });
 
-  router.get('/refresh/status', function(req, res) {
+  router.get('/refresh/status', requireScope('ai-impact:read'), function(req, res) {
     res.json(refreshState);
   });
 
-  router.post('/refresh', requireAdmin, async function(req, res) {
+  router.post('/refresh', requireAdmin, requireScope('ai-impact:write'), async function(req, res) {
     if (DEMO_MODE) {
       return res.json({ status: 'skipped', message: 'Refresh disabled in demo mode' });
     }

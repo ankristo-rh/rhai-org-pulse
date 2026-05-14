@@ -3,7 +3,7 @@ const { createEventStore } = require('./event-store');
 const { aggregateEvents, mergeDailyBreakdown } = require('./aggregator');
 
 function createHealthMetricsRouter(context) {
-  const { storage, requireAdmin, roleStore } = context;
+  const { storage, requireAdmin, requireScope, roleStore } = context;
   const { readFromStorage, writeToStorage } = storage;
   const { DATA_DIR } = require('../../shared/server/storage');
 
@@ -248,7 +248,7 @@ function createHealthMetricsRouter(context) {
   const PAGE_ID_PATTERN = /^[a-zA-Z0-9:_/-]+$/;
   const PAGE_ID_MAX_LENGTH = 200;
 
-  router.post('/track', (req, res) => {
+  router.post('/track', requireScope('health-metrics:write'), (req, res) => {
     if (DEMO_MODE) return res.json({ ok: true });
 
     const { page } = req.body;
@@ -293,12 +293,12 @@ function createHealthMetricsRouter(context) {
     res.json({ ok: true });
   });
 
-  router.get('/tracking/status', (req, res) => {
+  router.get('/tracking/status', requireScope('health-metrics:read'), (req, res) => {
     const optedOut = loadOptedOut();
     res.json({ optedOut: optedOut.emails.includes(req.userEmail) });
   });
 
-  router.post('/tracking/opt-out', (req, res) => {
+  router.post('/tracking/opt-out', requireScope('health-metrics:write'), (req, res) => {
     const optedOut = loadOptedOut();
     if (!optedOut.emails.includes(req.userEmail)) {
       optedOut.emails.push(req.userEmail);
@@ -307,7 +307,7 @@ function createHealthMetricsRouter(context) {
     res.json({ ok: true, optedOut: true });
   });
 
-  router.delete('/tracking/opt-out', (req, res) => {
+  router.delete('/tracking/opt-out', requireScope('health-metrics:write'), (req, res) => {
     const optedOut = loadOptedOut();
     const idx = optedOut.emails.indexOf(req.userEmail);
     if (idx !== -1) {
@@ -319,7 +319,7 @@ function createHealthMetricsRouter(context) {
 
   // ─── Routes: Dashboard (admin or viewer) ───
 
-  router.get('/dashboard', requireMetricsViewer, (req, res) => {
+  router.get('/dashboard', requireMetricsViewer, requireScope('health-metrics:read'), (req, res) => {
     const to = req.query.to || new Date().toISOString().slice(0, 10);
     const fromDate = new Date(req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
     const toDate = new Date(to);
@@ -389,7 +389,7 @@ function createHealthMetricsRouter(context) {
     });
   });
 
-  router.get('/pages', requireMetricsViewer, (req, res) => {
+  router.get('/pages', requireMetricsViewer, requireScope('health-metrics:read'), (req, res) => {
     const to = req.query.to || new Date().toISOString().slice(0, 10);
     const fromDate = new Date(req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
     const toDate = new Date(to);
@@ -423,7 +423,7 @@ function createHealthMetricsRouter(context) {
     res.json({ pages });
   });
 
-  router.get('/pages/:pageId', requireMetricsViewer, (req, res) => {
+  router.get('/pages/:pageId', requireMetricsViewer, requireScope('health-metrics:read'), (req, res) => {
     const pageId = req.params.pageId;
     const to = req.query.to || new Date().toISOString().slice(0, 10);
     const fromDate = new Date(req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
@@ -456,7 +456,7 @@ function createHealthMetricsRouter(context) {
     res.json({ pageId, ...merged, daily });
   });
 
-  router.get('/user-types', requireMetricsViewer, (req, res) => {
+  router.get('/user-types', requireMetricsViewer, requireScope('health-metrics:read'), (req, res) => {
     const to = req.query.to || new Date().toISOString().slice(0, 10);
     const fromDate = new Date(req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
     const toDate = new Date(to);
@@ -477,11 +477,11 @@ function createHealthMetricsRouter(context) {
 
   // ─── Routes: Admin config ───
 
-  router.get('/config', requireAdmin, (req, res) => {
+  router.get('/config', requireAdmin, requireScope('health-metrics:read'), (req, res) => {
     res.json(loadConfig());
   });
 
-  router.post('/config', requireAdmin, (req, res) => {
+  router.post('/config', requireAdmin, requireScope('health-metrics:write'), (req, res) => {
     const config = loadConfig();
     if (req.body.userTypeFieldId !== undefined) {
       config.userTypeFieldId = req.body.userTypeFieldId;
@@ -498,7 +498,7 @@ function createHealthMetricsRouter(context) {
     res.json(config);
   });
 
-  router.post('/aggregate', requireAdmin, (req, res) => {
+  router.post('/aggregate', requireAdmin, requireScope('health-metrics:write'), (req, res) => {
     const monthFiles = eventStore.listMonthFiles();
     let generated = 0;
     for (const monthKey of monthFiles) {
@@ -512,7 +512,7 @@ function createHealthMetricsRouter(context) {
     res.json({ ok: true, generated });
   });
 
-  router.delete('/events', requireAdmin, (req, res) => {
+  router.delete('/events', requireAdmin, requireScope('health-metrics:write'), (req, res) => {
     eventStore.deleteAllEvents();
     invalidateCurrentMonthCache();
     res.json({ ok: true });
@@ -520,7 +520,7 @@ function createHealthMetricsRouter(context) {
 
   // ─── Routes: Field definitions (for settings UI) ───
 
-  router.get('/field-definitions', requireAdmin, (req, res) => {
+  router.get('/field-definitions', requireAdmin, requireScope('health-metrics:read'), (req, res) => {
     const fieldDefs = readFromStorage('team-data/field-definitions.json');
     if (!fieldDefs) return res.json({ person: [], team: [] });
     // Return only person-level fields for user-type selection
@@ -530,7 +530,7 @@ function createHealthMetricsRouter(context) {
 
   // ─── Routes: Viewer management ───
 
-  router.get('/viewers', requireAdmin, (req, res) => {
+  router.get('/viewers', requireAdmin, requireScope('health-metrics:read'), (req, res) => {
     const assignments = roleStore.listAssignments();
     const viewers = Object.entries(assignments)
       .filter(([, entry]) => Array.isArray(entry.roles) && entry.roles.includes('usage-metrics-viewer'))
@@ -538,14 +538,14 @@ function createHealthMetricsRouter(context) {
     res.json({ viewers });
   });
 
-  router.post('/viewers', requireAdmin, (req, res) => {
+  router.post('/viewers', requireAdmin, requireScope('health-metrics:write'), (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'email is required.' });
     roleStore.assignRole(email, 'usage-metrics-viewer', req.userEmail);
     res.json({ ok: true });
   });
 
-  router.delete('/viewers/:email', requireAdmin, (req, res) => {
+  router.delete('/viewers/:email', requireAdmin, requireScope('health-metrics:write'), (req, res) => {
     roleStore.revokeRole(req.params.email, 'usage-metrics-viewer');
     res.json({ ok: true });
   });

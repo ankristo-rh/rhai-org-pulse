@@ -63,7 +63,7 @@ Core team owns `shared/` via CODEOWNERS. Changes require core team review.
 |--------|-------------|
 | `storage` | `{ readFromStorage, writeToStorage, listStorageFiles, deleteStorageDirectory }` — filesystem-backed JSON storage |
 | `demoStorage` | `{ readFromStorage, writeToStorage, listStorageFiles, deleteStorageDirectory }` — fixture-backed read-only storage for demo mode |
-| `createAuthMiddleware(readFromStorage, writeToStorage, options)` | Factory returning `{ authMiddleware, requireAdmin, requireTeamAdmin, isAdmin, seedRoles }`. Options: `{ tokenValidator, roleStore }` |
+| `createAuthMiddleware(readFromStorage, writeToStorage, options)` | Factory returning `{ authMiddleware, requireAdmin, requireTeamAdmin, requireScope, isAdmin, seedRoles }`. `requireScope(scopeName)` returns Express middleware that enforces the given scope for token-authenticated requests (browser/proxy auth is unrestricted). Options: `{ tokenValidator, roleStore }` |
 | `createRoleStore(readFromStorage, writeToStorage)` | Factory returning role CRUD: `{ getRoles, hasRole, assignRole, revokeRole, listAssignments, getAdminEmails, migrateFromAllowlist }` |
 | `blockDuringImpersonation` | Express middleware that returns 403 during impersonation. Exported from auth.js. |
 | `googleSheets` | `{ getAuth, discoverSheetNames, fetchRawSheet }` — Google Sheets auth and raw data fetching |

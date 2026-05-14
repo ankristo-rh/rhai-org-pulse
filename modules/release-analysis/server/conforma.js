@@ -12,11 +12,11 @@ function validateRelease(r) {
 }
 
 module.exports = function registerConformaRoutes(router, context) {
-  const { storage, requireAuth, requireAdmin } = context
+  const { storage, requireAuth, requireAdmin, requireScope } = context
   const { readFromStorage, writeToStorage, deleteFromStorage } = storage
 
   // GET /conforma/status
-  router.get('/conforma/status', requireAuth, function (req, res) {
+  router.get('/conforma/status', requireAuth, requireScope('release-analysis:read'), function (req, res) {
     const data = readFromStorage(STORAGE_KEY)
     if (!data) return res.json({ status: 'no_data' })
     res.json({
@@ -27,7 +27,7 @@ module.exports = function registerConformaRoutes(router, context) {
   })
 
   // GET /conforma/releases — list all
-  router.get('/conforma/releases', requireAuth, function (req, res) {
+  router.get('/conforma/releases', requireAuth, requireScope('release-analysis:read'), function (req, res) {
     const data = readFromStorage(STORAGE_KEY)
     if (!data) {
       return res.status(404).json({ error: 'No conforma data available. Run the ingestion pipeline.' })
@@ -41,7 +41,7 @@ module.exports = function registerConformaRoutes(router, context) {
   })
 
   // GET /conforma/releases/:version — single release
-  router.get('/conforma/releases/:version', requireAuth, function (req, res) {
+  router.get('/conforma/releases/:version', requireAuth, requireScope('release-analysis:read'), function (req, res) {
     const data = readFromStorage(STORAGE_KEY)
     if (!data) {
       return res.status(404).json({ error: 'No conforma data available.' })
@@ -54,7 +54,7 @@ module.exports = function registerConformaRoutes(router, context) {
   })
 
   // POST /conforma/bulk — ingest releases (admin only, called by pipeline)
-  router.post('/conforma/bulk', requireAdmin, function (req, res) {
+  router.post('/conforma/bulk', requireAdmin, requireScope('release-analysis:write'), function (req, res) {
     if (process.env.DEMO_MODE === 'true') {
       return res.json({ status: 'skipped', message: 'Conforma ingest disabled in demo mode.' })
     }
@@ -95,7 +95,7 @@ module.exports = function registerConformaRoutes(router, context) {
   })
 
   // DELETE /conforma — clear all data (admin only)
-  router.delete('/conforma', requireAdmin, function (req, res) {
+  router.delete('/conforma', requireAdmin, requireScope('release-analysis:write'), function (req, res) {
     if (process.env.DEMO_MODE === 'true') {
       return res.status(400).json({ error: 'Cannot delete in demo mode.' })
     }

@@ -22,7 +22,7 @@ function isOrgSyncInProgress() {
 }
 
 module.exports = function registerOrgTeamsRoutes(router, context) {
-  const { storage, requireAdmin } = context;
+  const { storage, requireAdmin, requireScope } = context;
   const { readFromStorage, writeToStorage } = storage;
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
@@ -228,7 +228,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       200:
    *         description: List of enriched teams with unassigned people
    */
-  router.get('/org-teams', function(req, res) {
+  router.get('/org-teams', requireScope('roster:read'), function(req, res) {
     try {
       const { teams, unassigned, totalPeople, fetchedAt } = buildEnrichedTeams(req.query.org);
       const rfeData = readFromStorage('org-roster/rfe-backlog.json');
@@ -265,7 +265,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       404:
    *         description: Team not found
    */
-  router.get('/org-teams/:teamKey', function(req, res) {
+  router.get('/org-teams/:teamKey', requireScope('roster:read'), function(req, res) {
     try {
       const teamKey = decodeURIComponent(req.params.teamKey);
       const sepIdx = teamKey.indexOf('::');
@@ -305,7 +305,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       200:
    *         description: List of team members
    */
-  router.get('/org-teams/:teamKey/members', function(req, res) {
+  router.get('/org-teams/:teamKey/members', requireScope('roster:read'), function(req, res) {
     try {
       const teamKey = decodeURIComponent(req.params.teamKey);
       const sepIdx = teamKey.indexOf('::');
@@ -340,7 +340,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       200:
    *         description: List of orgs
    */
-  router.get('/org-list', function(req, res) {
+  router.get('/org-list', requireScope('roster:read'), function(req, res) {
     try {
       // Derive orgs and team counts from people data (source of truth)
       const allPeople = getAllPeople(storage);
@@ -394,7 +394,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       404:
    *         description: No data for this org
    */
-  router.get('/org-summary/:orgName', function(req, res) {
+  router.get('/org-summary/:orgName', requireScope('roster:read'), function(req, res) {
     try {
       const orgName = decodeURIComponent(req.params.orgName);
       const isAll = orgName === '_all';
@@ -460,7 +460,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *         description: Component map
    *     deprecated: true
    */
-  router.get('/components', function(req, res) {
+  router.get('/components', requireScope('team-tracker:read'), function(req, res) {
     try {
       const { teams } = buildEnrichedTeams();
       const components = {};
@@ -495,7 +495,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       200:
    *         description: RFE backlog grouped by component and team
    */
-  router.get('/rfe-backlog', function(req, res) {
+  router.get('/rfe-backlog', requireScope('roster:read'), function(req, res) {
     try {
       const data = readFromStorage('org-roster/rfe-backlog.json');
       if (!data) return res.json({ byComponent: {}, byTeam: {} });
@@ -527,7 +527,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       200:
    *         description: RFE configuration
    */
-  router.get('/rfe-config', function(req, res) {
+  router.get('/rfe-config', requireScope('roster:read'), function(req, res) {
     try {
       const config = getOrgConfig();
       res.json({
@@ -555,7 +555,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       403:
    *         description: Admin access required
    */
-  router.get('/org-config', requireAdmin, function(req, res) {
+  router.get('/org-config', requireAdmin, requireScope('roster:write'), function(req, res) {
     try { res.json(getOrgConfig()); }
     catch { res.status(500).json({ error: 'Failed to load configuration' }); }
   });
@@ -572,7 +572,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       403:
    *         description: Admin access required
    */
-  router.post('/org-config', requireAdmin, function(req, res) {
+  router.post('/org-config', requireAdmin, requireScope('roster:write'), function(req, res) {
     try {
       const body = req.body;
       if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -609,7 +609,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       403:
    *         description: Admin access required
    */
-  router.get('/sheet-orgs', requireAdmin, async function(req, res) {
+  router.get('/sheet-orgs', requireAdmin, requireScope('roster:write'), async function(req, res) {
     try {
       const config = getOrgConfig();
       const tabName = config.teamBoardsTab;
@@ -644,7 +644,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       200:
    *         description: List of configured org names
    */
-  router.get('/configured-orgs', function(req, res) {
+  router.get('/configured-orgs', requireScope('roster:read'), function(req, res) {
     try {
       const displayNames = buildOrgKeyToDisplayName();
       const orgs = Object.values(displayNames).sort();
@@ -667,7 +667,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       200:
    *         description: Sync status with last sync time and current state
    */
-  router.get('/org-sync/status', function(req, res) {
+  router.get('/org-sync/status', requireScope('roster:read'), function(req, res) {
     try {
       const data = readFromStorage('org-roster/sync-status.json');
       res.json(data || { lastSyncAt: null, status: 'never', syncing: orgSyncInProgress });
@@ -724,7 +724,7 @@ module.exports = function registerOrgTeamsRoutes(router, context) {
    *       409:
    *         description: Sync already in progress
    */
-  router.post('/org-sync/trigger', requireAdmin, async function(req, res) {
+  router.post('/org-sync/trigger', requireAdmin, requireScope('roster:write'), async function(req, res) {
     if (orgSyncInProgress) return res.status(409).json({ error: 'Sync already in progress' });
 
     res.json({ status: 'started' });

@@ -1,5 +1,5 @@
 module.exports = function registerRoutes(router, context) {
-  const { storage, requireAdmin, requireTeamAdmin, roleStore } = context;
+  const { storage, requireAdmin, requireTeamAdmin, requireScope, roleStore } = context;
   const { readFromStorage, writeToStorage, listStorageFiles, deleteStorageDirectory } = storage;
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
@@ -510,7 +510,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Permission info
    */
-  router.get('/permissions/me', function(req, res) {
+  router.get('/permissions/me', requireScope('roster:read'), function(req, res) {
     const managed = req.userUid
       ? [...permissions.getManagedUids(req.userUid, managerMap)]
       : [];
@@ -539,7 +539,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: User is not a manager
    */
-  router.get('/manager/dashboard', function(req, res) {
+  router.get('/manager/dashboard', requireScope('roster:read'), function(req, res) {
     // Handle null userUid (e.g. local dev where email isn't in registry)
     if (!req.userUid) {
       return res.json({
@@ -752,7 +752,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: List of teams
    */
-  router.get('/structure/teams', function(req, res) {
+  router.get('/structure/teams', requireScope('team-tracker:read'), function(req, res) {
     const data = teamStore.readTeams(storage);
     let teams = Object.values(data.teams);
     if (req.query.orgKey) {
@@ -771,7 +771,7 @@ module.exports = function registerRoutes(router, context) {
    *       201:
    *         description: Created team
    */
-  router.post('/structure/teams', requireTeamAdmin, function(req, res) {
+  router.post('/structure/teams', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const { name, orgKey } = req.body;
@@ -799,7 +799,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Updated team
    */
-  router.patch('/structure/teams/:teamId', requireTeamAdmin, function(req, res) {
+  router.patch('/structure/teams/:teamId', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const { name } = req.body;
@@ -827,7 +827,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Deletion result
    */
-  router.delete('/structure/teams/:teamId', requireTeamAdmin, function(req, res) {
+  router.delete('/structure/teams/:teamId', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const result = teamStore.deleteTeam(storage, req.params.teamId, req.auditActor);
@@ -857,6 +857,7 @@ module.exports = function registerRoutes(router, context) {
    */
   router.post('/structure/teams/:teamId/members',
     requireManagerOrAdmin(req => req.body.uid),
+    requireScope('team-tracker:write'),
     function(req, res) {
       const guard = demoWriteGuard(res);
       if (guard) return;
@@ -886,7 +887,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Bulk assignment result
    */
-  router.post('/structure/teams/:teamId/members/bulk', function(req, res) {
+  router.post('/structure/teams/:teamId/members/bulk', requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const { uids } = req.body;
@@ -933,6 +934,7 @@ module.exports = function registerRoutes(router, context) {
    */
   router.delete('/structure/teams/:teamId/members/:uid',
     requireManagerOrAdmin(req => req.params.uid),
+    requireScope('team-tracker:write'),
     function(req, res) {
       const guard = demoWriteGuard(res);
       if (guard) return;
@@ -962,7 +964,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: List of unassigned people
    */
-  router.get('/structure/unassigned', function(req, res) {
+  router.get('/structure/unassigned', requireScope('team-tracker:read'), function(req, res) {
     const VALID_SCOPES = ['all', 'direct', 'org'];
     const scope = req.query.scope || 'all';
     if (!VALID_SCOPES.includes(scope)) {
@@ -985,7 +987,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Person and team field definitions
    */
-  router.get('/structure/field-definitions', function(req, res) {
+  router.get('/structure/field-definitions', requireScope('team-tracker:read'), function(req, res) {
     const defs = fieldStore.readFieldDefinitions(storage);
     // Filter out soft-deleted fields for non-admin/team-admin users
     if (!req.isAdmin && !req.isTeamAdmin) {
@@ -1019,7 +1021,7 @@ module.exports = function registerRoutes(router, context) {
    *       201:
    *         description: Created field definition
    */
-  router.post('/structure/field-definitions/person', requireTeamAdmin, function(req, res) {
+  router.post('/structure/field-definitions/person', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const { label, type, required, visible, primaryDisplay, allowedValues, multiValue, optionsRef } = req.body;
@@ -1053,7 +1055,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Updated field definition
    */
-  router.patch('/structure/field-definitions/person/:fieldId', requireTeamAdmin, function(req, res) {
+  router.patch('/structure/field-definitions/person/:fieldId', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     try {
@@ -1082,7 +1084,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Deleted field definition
    */
-  router.delete('/structure/field-definitions/person/:fieldId', requireTeamAdmin, function(req, res) {
+  router.delete('/structure/field-definitions/person/:fieldId', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const result = fieldStore.softDeleteField(storage, 'person', req.params.fieldId, req.auditActor);
@@ -1100,7 +1102,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Reorder confirmation
    */
-  router.post('/structure/field-definitions/person/reorder', requireTeamAdmin, function(req, res) {
+  router.post('/structure/field-definitions/person/reorder', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const { orderedIds } = req.body;
@@ -1121,7 +1123,7 @@ module.exports = function registerRoutes(router, context) {
    *       201:
    *         description: Created field definition
    */
-  router.post('/structure/field-definitions/team', requireTeamAdmin, function(req, res) {
+  router.post('/structure/field-definitions/team', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const { label, type, required, visible, primaryDisplay, allowedValues, multiValue, optionsRef } = req.body;
@@ -1155,7 +1157,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Updated field definition
    */
-  router.patch('/structure/field-definitions/team/:fieldId', requireTeamAdmin, function(req, res) {
+  router.patch('/structure/field-definitions/team/:fieldId', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     try {
@@ -1184,7 +1186,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Deleted field definition
    */
-  router.delete('/structure/field-definitions/team/:fieldId', requireTeamAdmin, function(req, res) {
+  router.delete('/structure/field-definitions/team/:fieldId', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const result = fieldStore.softDeleteField(storage, 'team', req.params.fieldId, req.auditActor);
@@ -1202,7 +1204,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Reorder confirmation
    */
-  router.post('/structure/field-definitions/team/reorder', requireTeamAdmin, function(req, res) {
+  router.post('/structure/field-definitions/team/reorder', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const { orderedIds } = req.body;
@@ -1242,7 +1244,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: List of field option sets
    */
-  router.get('/field-options', function(req, res) {
+  router.get('/field-options', requireScope('team-tracker:read'), function(req, res) {
     try {
       const options = fieldOptionsStore.listFieldOptions(storage);
       res.json({ options });
@@ -1268,7 +1270,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Field option set with values
    */
-  router.get('/field-options/:name', function(req, res) {
+  router.get('/field-options/:name', requireScope('team-tracker:read'), function(req, res) {
     const safeName = sanitizeOptionsName(req.params.name);
     if (!safeName) return res.status(400).json({ error: 'Invalid option set name' });
     try {
@@ -1297,7 +1299,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Updated field option set
    */
-  router.put('/field-options/:name', requireAdmin, function(req, res) {
+  router.put('/field-options/:name', requireAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const safeName = sanitizeOptionsName(req.params.name);
@@ -1332,7 +1334,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Updated field option set
    */
-  router.post('/field-options/:name/values', requireTeamAdmin, function(req, res) {
+  router.post('/field-options/:name/values', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const safeName = sanitizeOptionsName(req.params.name);
@@ -1372,7 +1374,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Updated field option set
    */
-  router.delete('/field-options/:name/values', requireAdmin, function(req, res) {
+  router.delete('/field-options/:name/values', requireAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const safeName = sanitizeOptionsName(req.params.name);
@@ -1418,7 +1420,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Rename result with count of updated records
    */
-  router.patch('/field-options/:name/values/rename', requireTeamAdmin, function(req, res) {
+  router.patch('/field-options/:name/values/rename', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const safeName = sanitizeOptionsName(req.params.name);
@@ -1459,6 +1461,7 @@ module.exports = function registerRoutes(router, context) {
    */
   router.patch('/structure/person/:uid/fields',
     requireManagerOrAdmin(req => req.params.uid),
+    requireScope('team-tracker:write'),
     function(req, res) {
       const guard = demoWriteGuard(res);
       if (guard) return;
@@ -1500,7 +1503,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Updated team metadata
    */
-  router.patch('/structure/teams/:teamId/fields', requireTeamPurview, function(req, res) {
+  router.patch('/structure/teams/:teamId/fields', requireTeamPurview, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     if (typeof req.body !== 'object' || Array.isArray(req.body) || !req.body) {
@@ -1542,7 +1545,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Updated boards list
    */
-  router.patch('/structure/teams/:teamId/boards', requireTeamPurview, function(req, res) {
+  router.patch('/structure/teams/:teamId/boards', requireTeamPurview, requireScope('team-tracker:write'), function(req, res) {
     const guard = demoWriteGuard(res);
     if (guard) return;
     const { boards } = req.body;
@@ -1626,7 +1629,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Audit log entries
    */
-  router.get('/structure/audit-log', function(req, res) {
+  router.get('/structure/audit-log', requireScope('team-tracker:read'), function(req, res) {
     // Only admin and managers can view audit log
     if (req.permissionTier === 'user') {
       return res.status(403).json({ error: 'Manager or admin access required' });
@@ -1674,7 +1677,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Migration preview data
    */
-  router.get('/structure/migrate/preview', requireAdmin, async function(req, res) {
+  router.get('/structure/migrate/preview', requireAdmin, requireScope('team-tracker:write'), async function(req, res) {
     try {
       const config = rosterSyncConfig.loadConfig(storage);
       if (!config) return res.status(400).json({ error: 'No config found' });
@@ -1696,7 +1699,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Migration result
    */
-  router.post('/structure/migrate', requireAdmin, async function(req, res) {
+  router.post('/structure/migrate', requireAdmin, requireScope('team-tracker:write'), async function(req, res) {
     try {
       const guard = demoWriteGuard(res);
       if (guard) return;
@@ -1737,7 +1740,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Migration preview with extracted values
    */
-  router.get('/structure/migrate/field-to-options/preview', requireTeamAdmin, function(req, res) {
+  router.get('/structure/migrate/field-to-options/preview', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     try {
       const { fieldId } = req.query;
       if (!fieldId || typeof fieldId !== 'string') {
@@ -1762,7 +1765,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Migration result
    */
-  router.post('/structure/migrate/field-to-options', requireTeamAdmin, function(req, res) {
+  router.post('/structure/migrate/field-to-options', requireTeamAdmin, requireScope('team-tracker:write'), function(req, res) {
     try {
       const guard = demoWriteGuard(res);
       if (guard) return;
@@ -1798,7 +1801,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.get('/refresh/status', requireAdmin, function(req, res) {
+  router.get('/refresh/status', requireAdmin, requireScope('metrics:read'), function(req, res) {
     res.json(refreshState);
   });
 
@@ -1828,7 +1831,7 @@ module.exports = function registerRoutes(router, context) {
    *       500:
    *         description: Server error
    */
-  router.post('/refresh', async function(req, res) {
+  router.post('/refresh', requireScope('metrics:write'), async function(req, res) {
     const { scope, name, teamKey, orgKey } = req.body || {};
     const force = req.body?.force === true;
     const sources = req.body?.sources || { jira: true, github: true, gitlab: true };
@@ -2125,7 +2128,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Array of configured sprint boards
    */
-  router.get('/boards', function(req, res) {
+  router.get('/boards', requireScope('metrics:read'), function(req, res) {
     try {
       const teamsData = readFromStorage('teams.json');
       if (!teamsData || !teamsData.teams) {
@@ -2167,7 +2170,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: List of sprints for the board
    */
-  router.get('/boards/:boardId/sprints', function(req, res) {
+  router.get('/boards/:boardId/sprints', requireScope('metrics:read'), function(req, res) {
     try {
       const { boardId } = req.params;
       const data = readFromStorage(`sprints/team-${boardId}.json`)
@@ -2199,7 +2202,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Sprint trend data for the board
    */
-  router.get('/boards/:boardId/trend', function(req, res) {
+  router.get('/boards/:boardId/trend', requireScope('metrics:read'), function(req, res) {
     try {
       const { boardId } = req.params;
       const sprintIndex = readFromStorage(`sprints/team-${boardId}.json`)
@@ -2261,7 +2264,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Sprint detail data
    */
-  router.get('/sprints/:sprintId', function(req, res) {
+  router.get('/sprints/:sprintId', requireScope('metrics:read'), function(req, res) {
     try {
       const { sprintId } = req.params;
       const data = readFromStorage(`sprints/${sprintId}.json`);
@@ -2287,7 +2290,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Sprint board team configuration
    */
-  router.get('/teams', function(req, res) {
+  router.get('/teams', requireScope('roster:read'), function(req, res) {
     try {
       const data = readFromStorage('teams.json');
       if (!data) {
@@ -2318,7 +2321,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.post('/teams', requireAdmin, function(req, res) {
+  router.post('/teams', requireAdmin, requireScope('roster:write'), function(req, res) {
     try {
       const { teams } = req.body;
       if (!teams || !Array.isArray(teams)) {
@@ -2342,7 +2345,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Dashboard summary data
    */
-  router.get('/dashboard-summary', function(req, res) {
+  router.get('/dashboard-summary', requireScope('metrics:read'), function(req, res) {
     try {
       const data = readFromStorage('dashboard-summary.json');
       if (data) {
@@ -2431,7 +2434,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Aggregated trend data
    */
-  router.get('/trend', function(req, res) {
+  router.get('/trend', requireScope('metrics:read'), function(req, res) {
     try {
       const boardIds = (req.query.boardIds || '').split(',').filter(Boolean);
       if (boardIds.length === 0) {
@@ -2494,7 +2497,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Last refresh timestamp and config info
    */
-  router.get('/last-refreshed', function(req, res) {
+  router.get('/last-refreshed', requireScope('metrics:read'), function(req, res) {
     const data = readFromStorage('last-refreshed.json');
     const jiraConfig = jiraSyncConfig.loadConfig(storage);
     res.json({
@@ -2517,7 +2520,7 @@ module.exports = function registerRoutes(router, context) {
    *             schema:
    *               $ref: '#/components/schemas/RosterResponse'
    */
-  router.get('/roster', function(req, res) {
+  router.get('/roster', requireScope('roster:read'), function(req, res) {
     try {
       const full = readRosterFull();
       if (!full) {
@@ -2555,7 +2558,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Metrics for all people
    */
-  router.get('/people/metrics', function(req, res) {
+  router.get('/people/metrics', requireScope('metrics:read'), function(req, res) {
     try {
       const files = listStorageFiles('people');
       if (files.length === 0) return res.json({});
@@ -2605,7 +2608,7 @@ module.exports = function registerRoutes(router, context) {
    *             schema:
    *               $ref: '#/components/schemas/PersonMetrics'
    */
-  router.get('/person/:jiraDisplayName/metrics', async function(req, res) {
+  router.get('/person/:jiraDisplayName/metrics', requireScope('metrics:read'), async function(req, res) {
     try {
       const name = decodeURIComponent(req.params.jiraDisplayName);
       const key = sanitizeFilename(name);
@@ -2647,7 +2650,7 @@ module.exports = function registerRoutes(router, context) {
    *             schema:
    *               $ref: '#/components/schemas/TeamMetrics'
    */
-  router.get('/team/:teamKey/metrics', function(req, res) {
+  router.get('/team/:teamKey/metrics', requireScope('metrics:read'), function(req, res) {
     try {
       const teamKey = decodeURIComponent(req.params.teamKey);
       const roster = deriveRoster();
@@ -2758,7 +2761,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.delete('/jira-name-cache', requireAdmin, function(req, res) {
+  router.delete('/jira-name-cache', requireAdmin, requireScope('metrics:write'), function(req, res) {
     jiraNameCache = {};
     writeToStorage('jira-name-map.json', {});
     res.json({ success: true });
@@ -2780,7 +2783,7 @@ module.exports = function registerRoutes(router, context) {
    *             schema:
    *               $ref: '#/components/schemas/GitHubContributions'
    */
-  router.get('/github/contributions', function(req, res) {
+  router.get('/github/contributions', requireScope('github:read'), function(req, res) {
     try {
       const cache = readGithubCache();
       res.json(cache);
@@ -2807,7 +2810,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: GitHub contribution data for the user
    */
-  router.get('/github/contributions/:username', function(req, res) {
+  router.get('/github/contributions/:username', requireScope('github:read'), function(req, res) {
     try {
       const username = decodeURIComponent(req.params.username);
       const cache = readGithubCache();
@@ -2835,7 +2838,7 @@ module.exports = function registerRoutes(router, context) {
    *             schema:
    *               $ref: '#/components/schemas/GitLabContributions'
    */
-  router.get('/gitlab/contributions', function(req, res) {
+  router.get('/gitlab/contributions', requireScope('gitlab:read'), function(req, res) {
     try {
       const cache = readGitlabCache();
       res.json(cache);
@@ -2862,7 +2865,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: GitLab contribution data for the user
    */
-  router.get('/gitlab/contributions/:username', function(req, res) {
+  router.get('/gitlab/contributions/:username', requireScope('gitlab:read'), function(req, res) {
     try {
       const username = decodeURIComponent(req.params.username);
       const cache = readGitlabCache();
@@ -2886,7 +2889,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Combined trend data from all sources
    */
-  router.get('/trends', function(req, res) {
+  router.get('/trends', requireScope('metrics:read'), function(req, res) {
     try {
       const jira = buildJiraTrends();
       const github = readGithubHistoryCache();
@@ -2917,7 +2920,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Annotations for the sprint
    */
-  router.get('/sprints/:sprintId/annotations', function(req, res) {
+  router.get('/sprints/:sprintId/annotations', requireScope('metrics:read'), function(req, res) {
     try {
       const { sprintId } = req.params;
       const data = readFromStorage(`annotations/${sprintId}.json`);
@@ -2959,7 +2962,7 @@ module.exports = function registerRoutes(router, context) {
    *       400:
    *         description: Missing assignee or text
    */
-  router.put('/sprints/:sprintId/annotations', function(req, res) {
+  router.put('/sprints/:sprintId/annotations', requireScope('metrics:write'), function(req, res) {
     try {
       const { sprintId } = req.params;
       const { assignee, text } = req.body;
@@ -3021,7 +3024,7 @@ module.exports = function registerRoutes(router, context) {
    *       404:
    *         description: Annotation not found
    */
-  router.delete('/sprints/:sprintId/annotations/:assignee/:annotationId', requireAdmin, function(req, res) {
+  router.delete('/sprints/:sprintId/annotations/:assignee/:annotationId', requireAdmin, requireScope('metrics:write'), function(req, res) {
     try {
       const { sprintId, assignee, annotationId } = req.params;
       const data = readFromStorage(`annotations/${sprintId}.json`);
@@ -3060,7 +3063,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Configuration status
    */
-  router.get('/roster-sync/configured', function(req, res) {
+  router.get('/roster-sync/configured', requireScope('roster:read'), function(req, res) {
     try {
       const config = rosterSyncConfig.loadConfig(storage);
       res.json({ configured: !!config });
@@ -3090,7 +3093,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.get('/sheets/discover', requireAdmin, async function(req, res) {
+  router.get('/sheets/discover', requireAdmin, requireScope('team-tracker:read'), async function(req, res) {
     try {
       const { spreadsheetId } = req.query;
 
@@ -3124,7 +3127,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.get('/admin/roster-sync/field-definitions', requireAdmin, function(req, res) {
+  router.get('/admin/roster-sync/field-definitions', requireAdmin, requireScope('roster:write'), function(req, res) {
     try {
       const config = rosterSyncConfig.loadConfig(storage);
       res.json({ customFields: (config && config.customFields) || [] });
@@ -3146,7 +3149,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.get('/admin/roster-sync/config', requireAdmin, function(req, res) {
+  router.get('/admin/roster-sync/config', requireAdmin, requireScope('roster:write'), function(req, res) {
     try {
       const config = rosterSyncConfig.loadConfig(storage);
       if (!config) {
@@ -3180,7 +3183,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.post('/admin/roster-sync/config', requireAdmin, function(req, res) {
+  router.post('/admin/roster-sync/config', requireAdmin, requireScope('roster:write'), function(req, res) {
     try {
       const { orgRoots, googleSheetId, sheetNames, githubOrgs, gitlabGroups, gitlabInstances, teamStructure, excludedTitles, teamDataSource } = req.body;
 
@@ -3379,7 +3382,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.post('/admin/roster-sync/custom-fields', requireAdmin, function(req, res) {
+  router.post('/admin/roster-sync/custom-fields', requireAdmin, requireScope('roster:write'), function(req, res) {
     try {
       const { customFields } = req.body;
 
@@ -3456,7 +3459,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.post('/admin/roster-sync/trigger', requireAdmin, function(req, res) {
+  router.post('/admin/roster-sync/trigger', requireAdmin, requireScope('roster:write'), function(req, res) {
     try {
       if (consolidatedSync.isSyncInProgress()) {
         return res.json({ status: 'already_running' });
@@ -3492,7 +3495,7 @@ module.exports = function registerRoutes(router, context) {
    *         description: Forbidden — admin access required
    */
   // Status handler — uses unifiedSyncState which is set after org-teams routes register
-  router.get('/admin/roster-sync/status', requireAdmin, function(req, res) {
+  router.get('/admin/roster-sync/status', requireAdmin, requireScope('roster:write'), function(req, res) {
     try {
       const config = rosterSyncConfig.loadConfig(storage);
       const metadataSyncStatus = readFromStorage('org-roster/sync-status.json');
@@ -3549,7 +3552,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.get('/admin/jira-sync/config', requireAdmin, function(req, res) {
+  router.get('/admin/jira-sync/config', requireAdmin, requireScope('metrics:write'), function(req, res) {
     try {
       const config = jiraSyncConfig.loadConfig(storage);
       res.json({ projectKeys: [], ...config });
@@ -3579,7 +3582,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.post('/admin/jira-sync/config', requireAdmin, function(req, res) {
+  router.post('/admin/jira-sync/config', requireAdmin, requireScope('metrics:write'), function(req, res) {
     try {
       const { projectKeys } = req.body;
 
@@ -3674,7 +3677,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Array of team snapshots
    */
-  router.get('/snapshots/:teamKey', function(req, res) {
+  router.get('/snapshots/:teamKey', requireScope('team-tracker:read'), function(req, res) {
     try {
       const teamKey = decodeURIComponent(req.params.teamKey);
       const data = getOrGenerateTeamSnapshots(teamKey);
@@ -3708,7 +3711,7 @@ module.exports = function registerRoutes(router, context) {
    *       200:
    *         description: Array of person snapshots
    */
-  router.get('/snapshots/:teamKey/:personName', function(req, res) {
+  router.get('/snapshots/:teamKey/:personName', requireScope('team-tracker:read'), function(req, res) {
     try {
       const teamKey = decodeURIComponent(req.params.teamKey);
       const personName = decodeURIComponent(req.params.personName);
@@ -3739,7 +3742,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.post('/snapshots/generate', requireAdmin, function(req, res) {
+  router.post('/snapshots/generate', requireAdmin, requireScope('team-tracker:write'), function(req, res) {
     try {
       const roster = deriveRoster();
       const completedPeriods = snapshots.getCompletedPeriods();
@@ -3791,7 +3794,7 @@ module.exports = function registerRoutes(router, context) {
    *       403:
    *         description: Forbidden — admin access required
    */
-  router.delete('/snapshots', requireAdmin, function(req, res) {
+  router.delete('/snapshots', requireAdmin, requireScope('team-tracker:write'), function(req, res) {
     try {
       const result = deleteStorageDirectory('snapshots');
       res.json({ success: true, deleted: result.deleted });
@@ -4080,7 +4083,7 @@ module.exports = function registerRoutes(router, context) {
    *       409:
    *         description: Sync already in progress
    */
-  router.post('/admin/roster-sync/unified', requireAdmin, function(req, res) {
+  router.post('/admin/roster-sync/unified', requireAdmin, requireScope('roster:write'), function(req, res) {
     if (DEMO_MODE) {
       return res.json({ status: 'skipped', message: 'Sync disabled in demo mode' });
     }

@@ -194,6 +194,7 @@ All routes prefixed with `/api`. Authenticated via OAuth proxy in production.
 - `/api/site-config` — site configuration
 - `/api/messages` — app-wide messages (computed + stored)
 - `/api/tokens` — current user's API tokens
+- `/api/token-scopes` — available scope catalog and presets
 - `/api/admin/tokens` — all API tokens (admin)
 - `/api/roster` — org/team structure with members
 - `/api/team/:teamKey/metrics` — team member metrics
@@ -298,6 +299,8 @@ All routes prefixed with `/api`. Authenticated via OAuth proxy in production.
 - `/api/health-metrics/viewers` — add viewer (admin)
 
 **PATCH:**
+- `/api/tokens/:id/scopes` — update own token scopes
+- `/api/admin/tokens/:id/scopes` — update any token scopes (admin)
 - `/api/modules/team-tracker/structure/teams/:teamId` — rename team (admin/team-admin)
 - `/api/modules/team-tracker/structure/field-definitions/person/:fieldId` — edit field def (admin/team-admin)
 - `/api/modules/team-tracker/structure/field-definitions/team/:fieldId` — edit field def (admin/team-admin)
