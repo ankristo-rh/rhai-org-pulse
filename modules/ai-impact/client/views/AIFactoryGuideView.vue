@@ -153,7 +153,7 @@ const testPlanSteps = [
   { name: 'Test Plan Generation', desc: 'AI analyzes the strategy and generates a structured test plan (TestPlan.md)', ai: true },
   { name: 'Quality Review', desc: 'AI scores the test plan across 5 dimensions (0-2 each, /10 total)', ai: true },
   { name: 'Auto-Revision', desc: 'Failing plans are automatically revised up to 2 cycles', ai: true },
-  { name: 'Human Sign-off', desc: 'QE or test lead reviews and approves via test-plan-human-sign-off label', ai: false },
+  { name: 'Human Sign-off', desc: 'Test engineer reviews and approves via test-plan-human-sign-off label', ai: false },
 ]
 
 const testPlanScoringCriteria = [
@@ -169,16 +169,19 @@ const testPlanLabels = [
   { name: 'test-plan-rubric-pass', color: 'green', desc: 'Test plan passed quality scoring (all criteria = 2)' },
   { name: 'test-plan-rubric-fail', color: 'red', desc: 'Test plan failed scoring — needs rework' },
   { name: 'test-plan-auto-revised', color: 'purple', desc: 'Test plan was automatically improved by AI' },
-  { name: 'test-plan-human-sign-off', color: 'indigo', desc: 'Human QE/test lead has approved the test plan' },
+  { name: 'test-plan-human-sign-off', color: 'indigo', desc: 'Human test engineer has approved the test plan' },
 ]
 
 const testPlanToolLinks = [
   { label: 'odh-test-gen plugin', icon: Code, url: 'https://github.com/opendatahub-io/odh-test-gen' },
+  { label: 'opendatahub-test-plans repo', icon: Archive, url: 'https://github.com/opendatahub-io/opendatahub-test-plans' },
   { label: 'Skills Registry', icon: BookOpen, url: 'https://github.com/opendatahub-io/skills-registry' },
+  { label: 'Test Plan Skills Docs', icon: BookOpen, url: 'https://opendatahub-io.github.io/skills-registry/plugins/test-plan/' },
 ]
 
 const testPlanCommunityLinks = [
-  { label: '#forum-rhai-ai-first', icon: HelpCircle, url: 'https://app.slack.com/client/E030G10V24F/forum-rhai-ai-first' },
+  { label: '#forum-rhai-ai-first', icon: HelpCircle, url: 'https://app.slack.com/client/E030G10V24F/C0APP9DDB2R' },
+  { label: '#wg-rhai-quality-eng-builder', icon: MessageSquare, url: 'https://app.slack.com/client/E030G10V24F/C0ANMTUF5FW' },
 ]
 
 function labelColorClasses(color) {
@@ -909,7 +912,7 @@ function labelColorClasses(color) {
             </li>
             <li class="flex items-start gap-3">
               <User :size="20" class="text-cyan-600 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
-              <span class="text-sm text-gray-700 dark:text-gray-300">After review, a QE lead or test engineer should sign off by adding <code class="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 text-xs rounded font-mono">test-plan-human-sign-off</code> in Jira</span>
+              <span class="text-sm text-gray-700 dark:text-gray-300">After review, a test engineer should sign off by adding <code class="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 text-xs rounded font-mono">test-plan-human-sign-off</code> in Jira</span>
             </li>
           </ul>
         </div>
