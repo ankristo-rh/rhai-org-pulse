@@ -36,9 +36,7 @@ module.exports = defineConfig({
     : [['list']],             // Local: console only
 
   use: {
-    // Base URL for container-to-container testing (frontend proxy port)
-    // Smoke tests and integration tests both use the containerized frontend
-    baseURL: process.env.BASE_URL || 'http://localhost:8080',
+    baseURL: process.env.BASE_URL || 'http://localhost:5173',
     actionTimeout: 10 * 1000,
   },
 
