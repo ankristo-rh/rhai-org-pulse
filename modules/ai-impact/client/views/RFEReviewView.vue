@@ -111,6 +111,10 @@ function handleNavigateToFeature(featureKey) {
   })
 }
 
+function handleNavigateToTestPlan(sourceKey) {
+  moduleNav.navigateTo('test-plan-review', { select: sourceKey })
+}
+
 // Handle incoming select param (cross-link from Feature Review)
 // Watch both params and rfeData — params may arrive before data is loaded
 watch([() => moduleNav.params.value, rfeData], ([params]) => {
@@ -214,6 +218,7 @@ watch([() => moduleNav.params.value, rfeData], ([params]) => {
       :loadAssessmentDetail="loadAssessmentDetail"
       @close="handleCloseModal"
       @navigateToFeature="handleNavigateToFeature"
+      @navigateToTestPlan="handleNavigateToTestPlan"
     />
 
     <AIImpactGuide />

@@ -118,10 +118,6 @@ test.describe('AI Impact Disabled Menu Items @ai-impact', () => {
     await testDisabledMenuItem(page, 'Implementation');
   });
 
-  test('QE / Validation menu item should be disabled', async ({ page }) => {
-    await testDisabledMenuItem(page, 'QE / Validation');
-  });
-
   test('Security Review menu item should be disabled', async ({ page }) => {
     await testDisabledMenuItem(page, 'Security Review');
   });
@@ -189,5 +185,9 @@ test.describe('AI Impact Views @ai-impact', () => {
 
   test('should load Jira AutoFix view', async ({ page }) => {
     await testView(page, 'autofix', 'AutoFix');
+  });
+
+  test('should load Test Plan Review view', async ({ page }) => {
+    await testView(page, 'test-plan-review', 'Test Plan Review');
   });
 });
