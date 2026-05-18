@@ -32,7 +32,8 @@ module.exports = async function releasesExport(addFile, storage, mapping) {
     addFile(`${EXECUTION_EXPORT_PREFIX}/index.json`, anonymizedIndex);
 
     // features/*.json
-    const featureFiles = listStorageFiles(`${EXECUTION_STORAGE_PREFIX}/features`);
+    let featureFiles;
+    try { featureFiles = listStorageFiles(`${EXECUTION_STORAGE_PREFIX}/features`) || []; } catch { featureFiles = []; }
     for (const fileName of featureFiles) {
       const feature = readFromStorage(`${EXECUTION_STORAGE_PREFIX}/features/${fileName}`);
       if (!feature) continue;
