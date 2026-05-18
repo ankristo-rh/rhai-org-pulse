@@ -11,6 +11,7 @@ configMapGenerator:
 - behavior: merge
   literals:
   - API_PUBLIC_URL=https://api-team-tracker.apps.int.spoke.prod.us-west-2.aws.paas.redhat.com
+  - AUTH_EMAIL_DOMAIN=cluster.local
   name: team-tracker-config
 
 patches:
@@ -19,6 +20,6 @@ patches:
 
 images:
 - name: quay.io/org-pulse/team-tracker-backend
-  newTag: 1a7c96de8779397aecd309e00af697cecf68af21
+  newTag: 2c602779d4ec2dd03568cb6d2cad04248bd604ce
 - name: quay.io/org-pulse/team-tracker-frontend
-  newTag: e700e8262b4e86ca70d63d2d6e681fee69292f3b
+  newTag: 28b5c62532f73c33934adbdec9ddf0ca26468178
