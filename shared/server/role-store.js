@@ -7,7 +7,7 @@ const auditLog = require('./audit-log');
 
 const ROLES_FILE = 'roles.json';
 const ALLOWLIST_FILE = 'allowlist.json';
-const VALID_ROLES = ['admin', 'team-admin', 'usage-metrics-viewer'];
+const VALID_ROLES = ['admin', 'team-admin', 'release-manager', 'usage-metrics-viewer'];
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
 /** Guard against prototype pollution via user-controlled object keys. */
@@ -87,7 +87,7 @@ function createRoleStore(readFromStorage, writeToStorage, options = {}) {
     if (!isSafeKey(normalized)) throw new Error('Invalid email');
     const data = readRoles();
 
-    if (!data.assignments[normalized]) {
+    if (!Object.hasOwn(data.assignments, normalized)) {
       data.assignments[normalized] = {
         roles: [],
         assignedBy: actor,
@@ -127,7 +127,7 @@ function createRoleStore(readFromStorage, writeToStorage, options = {}) {
     const normalized = normalizeEmail(email, authDomain);
     if (!isSafeKey(normalized)) throw new Error('Invalid email');
     const data = readRoles();
-    const entry = data.assignments[normalized];
+    const entry = Object.hasOwn(data.assignments, normalized) ? data.assignments[normalized] : null;
 
     if (!entry || !entry.roles.includes(role)) {
       throw new Error(`User ${normalized} does not have role "${role}"`);

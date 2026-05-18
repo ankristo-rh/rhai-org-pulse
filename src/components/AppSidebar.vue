@@ -263,9 +263,11 @@ import {
   KeyRound,
   ClipboardList,
   BookOpen,
+  Database,
   History,
   Hospital,
-  LayoutDashboard
+  LayoutDashboard,
+  Rocket
 } from 'lucide-vue-next'
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
@@ -306,10 +308,13 @@ const ICON_MAP = {
   'clipboard-list': ClipboardList,
   BookOpen,
   ClipboardList,
+  Database,
   History,
   Hospital,
   'hospital': Hospital,
-  LayoutDashboard
+  LayoutDashboard,
+  Rocket,
+  'rocket': Rocket
 }
 
 const props = defineProps({
@@ -321,6 +326,7 @@ const props = defineProps({
   isAdmin: Boolean,
   isTeamAdmin: { type: Boolean, default: false },
   isManager: { type: Boolean, default: false },
+  roles: { type: Array, default: () => [] },
   modules: { type: Array, default: () => [] },
   builtInManifests: { type: Array, default: () => [] },
   titlePrefix: { type: String, default: '' },
@@ -403,8 +409,10 @@ const navSections = computed(() => {
           if (item.requireCondition === 'in-app-mode' && props.teamDataSource !== 'in-app') return false
           if (!item.requireRole) return true
           if (props.isAdmin) return true
-          if (item.requireRole === 'team-admin') return props.isTeamAdmin
-          if (item.requireRole === 'manager') return props.isManager || props.isTeamAdmin
+          if (props.roles.includes(item.requireRole)) return true
+          // Fallback: team-admin sees manager items too
+          if (item.requireRole === 'manager' && (props.isTeamAdmin || props.isManager)) return true
+          if (item.requireRole === 'team-admin' && props.isTeamAdmin) return true
           return false
         })
         .map(item => ({
@@ -453,13 +461,16 @@ function isNavItemActive(item, section) {
     // item.id is "slug::viewId"
     const [slug, viewId] = item.id.split('::')
     if (props.activeModule !== slug) return false
-    // Mark dashboard-like views as active for the default nav item
+    // Check if the active view is a hidden route mapped to this nav item
     const manifest = props.builtInManifests.find(m => m.slug === slug)
+    const hiddenRoutes = manifest?.client?.hiddenRoutes || {}
+    if (hiddenRoutes[props.activeViewId] === viewId) return true
+    // Mark dashboard-like views as active for the default nav item
     const defaultItem = manifest?.client?.navItems?.find(n => n.default)
     if (defaultItem && viewId === defaultItem.id) {
-      // Active for the default view AND any internal-only views
+      // Active for the default view AND any unmapped internal-only views
       const navViewIds = new Set((manifest.client?.navItems || []).map(n => n.id))
-      return props.activeViewId === viewId || !navViewIds.has(props.activeViewId)
+      return props.activeViewId === viewId || (!navViewIds.has(props.activeViewId) && !(props.activeViewId in hiddenRoutes))
     }
     return props.activeViewId === viewId
   }

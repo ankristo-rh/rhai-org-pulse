@@ -10,6 +10,7 @@
       :is-admin="authIsAdmin"
       :is-team-admin="authIsTeamAdmin"
       :is-manager="authIsManager"
+      :roles="authRoles"
       :modules="gitStaticModules"
       :built-in-manifests="builtInManifests"
       :title-prefix="titlePrefix"
@@ -241,7 +242,7 @@ export default {
     AppMessages
   },
   setup() {
-    const { user: authUser, isAdmin: authIsAdmin, isTeamAdmin: authIsTeamAdmin, refresh: refreshAuth } = useAuth()
+    const { user: authUser, isAdmin: authIsAdmin, isTeamAdmin: authIsTeamAdmin, roles: authRoles, refresh: refreshAuth } = useAuth()
     const { isImpersonating, impersonatingUid: impersonatingUidRef, impersonatingName: impersonatingNameRef, stopImpersonating } = useImpersonation()
     const { isManager: authIsManager, refresh: refreshPermissions } = usePermissions()
     const { loadRoster, reloadRoster, teams, selectedOrgKey, selectOrg, rosterData } = useRoster()
@@ -428,6 +429,7 @@ export default {
       authUser,
       authIsAdmin,
       authIsTeamAdmin,
+      authRoles,
       authIsManager,
       isImpersonating,
       impersonatingUidValue,
