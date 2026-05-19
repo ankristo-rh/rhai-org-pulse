@@ -296,6 +296,9 @@ All routes prefixed with `/api`. Authenticated via OAuth proxy in production.
 - `/api/modules/ai-impact/test-plans/:key` — single test plan + history
 - `/api/modules/ai-impact/test-plans/status` — test plan data status (admin)
 - `/api/modules/ai-impact/test-plans/sync/status` — Jira sync status
+- `/api/modules/ai-impact/component-onboarding` — all component onboarding entries (latest projection)
+- `/api/modules/ai-impact/component-onboarding/:key` — single component onboarding entry + history
+- `/api/modules/ai-impact/component-onboarding/status` — component onboarding data status (admin)
 - `/api/health-metrics/tracking/status` — opt-out status
 - `/api/health-metrics/dashboard` — aggregated dashboard (admin/viewer)
 - `/api/health-metrics/pages` — per-page stats (admin/viewer)
@@ -371,6 +374,7 @@ All routes prefixed with `/api`. Authenticated via OAuth proxy in production.
 - `/api/modules/ai-impact/features/bulk` — bulk upsert features (admin)
 - `/api/modules/ai-impact/test-plans/bulk` — bulk upsert test plans (admin)
 - `/api/modules/ai-impact/test-plans/sync` — trigger test plan Jira sync (admin)
+- `/api/modules/ai-impact/component-onboarding/bulk` — bulk upsert component onboarding data (admin)
 - `/api/health-metrics/track` — record page view (rate-limited)
 - `/api/health-metrics/tracking/opt-out` — opt out (authenticated)
 - `/api/health-metrics/config` — update config (admin)
@@ -403,6 +407,7 @@ All routes prefixed with `/api`. Authenticated via OAuth proxy in production.
 - `/api/modules/ai-impact/assessments` — clear assessments (admin)
 - `/api/modules/ai-impact/features` — clear features (admin)
 - `/api/modules/ai-impact/test-plans` — clear test plans (admin)
+- `/api/modules/ai-impact/component-onboarding` — clear component onboarding data (admin)
 - `/api/modules/team-tracker/structure/teams/:teamId` — delete team (admin/team-admin)
 - `/api/modules/team-tracker/structure/teams/:teamId/members/:uid` — unassign person (manager/admin)
 - `/api/modules/team-tracker/structure/field-definitions/person/:fieldId` — soft-delete field (admin/team-admin)
