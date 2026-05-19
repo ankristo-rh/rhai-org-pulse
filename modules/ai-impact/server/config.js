@@ -6,7 +6,7 @@ const DEFAULT_CONFIG = {
   testExclusionLabel: 'rfe-creator-skill-testing',
   linkTypeName: 'Cloners',
   excludedStatuses: ['Closed'],
-  lookbackMonths: 12,
+  lookbackMonths: 0,
   trendThresholdPp: 2,
   autofixProjects: ['AIPCC', 'RHOAIENG'],
   autofixCreatedAfter: null,
@@ -99,11 +99,11 @@ function saveConfig(writeToStorage, config) {
     merged.docRequiredStatuses = config.docRequiredStatuses;
   }
 
-  // lookbackMonths — must be a positive integer
+  // lookbackMonths — must be a non-negative integer (0 = no lookback limit)
   if (config.lookbackMonths !== undefined) {
     const val = Number(config.lookbackMonths);
-    if (!Number.isInteger(val) || val < 1 || val > 120) {
-      throw new Error('lookbackMonths must be an integer between 1 and 120');
+    if (!Number.isInteger(val) || val < 0 || val > 120) {
+      throw new Error('lookbackMonths must be an integer between 0 and 120');
     }
     merged.lookbackMonths = val;
   }

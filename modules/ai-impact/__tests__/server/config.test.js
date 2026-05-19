@@ -41,9 +41,9 @@ describe('saveConfig', () => {
 
   it('rejects non-integer lookbackMonths', () => {
     const writeToStorage = vi.fn();
-    expect(() => saveConfig(writeToStorage, { lookbackMonths: 1.5 })).toThrow('integer between 1 and 120');
-    expect(() => saveConfig(writeToStorage, { lookbackMonths: 0 })).toThrow('integer between 1 and 120');
-    expect(() => saveConfig(writeToStorage, { lookbackMonths: 121 })).toThrow('integer between 1 and 120');
+    expect(() => saveConfig(writeToStorage, { lookbackMonths: 1.5 })).toThrow('integer between 0 and 120');
+    expect(() => saveConfig(writeToStorage, { lookbackMonths: -1 })).toThrow('integer between 0 and 120');
+    expect(() => saveConfig(writeToStorage, { lookbackMonths: 121 })).toThrow('integer between 0 and 120');
   });
 
   it('rejects non-array excludedStatuses', () => {
