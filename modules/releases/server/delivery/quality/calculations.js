@@ -1,5 +1,6 @@
 /**
  * Compute cumulative bug count per version vs days since release
+ *
  * @param {Array} bugs - Filtered bug objects
  * @param {string[]} versions - Selected version names
  * @param {Map} versionReleaseMap - Map of version name to release date string
