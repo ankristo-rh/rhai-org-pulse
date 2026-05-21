@@ -1443,6 +1443,7 @@ module.exports = function registerRoutes(router, context) {
         writeToStorage(`releases/delivery/quality/bugs-${project}.json`, bugs)
       }
 
+      bugsCache = { data: null, timestamp: 0, projectsKey: '' }
       res.json({ success: true, fetchedAt: new Date().toISOString() })
     } catch (error) {
       console.error('[releases/quality] Refresh error:', error)
@@ -1464,6 +1465,14 @@ module.exports = function registerRoutes(router, context) {
     try {
       const config = getConfig(readFromStorage)
       const versions = readFromStorage('releases/delivery/quality/versions.json') || []
+
+      const cacheSnapshot = {
+        projectsKey: bugsCache.projectsKey,
+        cached: bugsCache.data !== null,
+        cacheSize: bugsCache.data ? bugsCache.data.length : 0,
+        cacheAge: bugsCache.timestamp ? Date.now() - bugsCache.timestamp : null
+      }
+
       const allBugs = loadAllBugs(config.projectKeys)
 
       const bugsByProject = {}
@@ -1471,9 +1480,6 @@ module.exports = function registerRoutes(router, context) {
         const bugs = readFromStorage(`releases/delivery/quality/bugs-${project}.json`) || []
         bugsByProject[project] = bugs.length
       }
-
-      // Clear cache to force fresh read on next request
-      bugsCache = { data: null, timestamp: 0, projectsKey: '' }
 
       const sampleBugs = allBugs.slice(0, 5).map(b => ({
         key: b.key,
@@ -1513,12 +1519,7 @@ module.exports = function registerRoutes(router, context) {
         sampleVersions,
         uniqueAffectedVersions,
         versionNames,
-        cacheInfo: {
-          projectsKey: bugsCache.projectsKey,
-          cached: bugsCache.data !== null,
-          cacheSize: bugsCache.data ? bugsCache.data.length : 0,
-          cacheAge: bugsCache.timestamp ? Date.now() - bugsCache.timestamp : null
-        }
+        cacheInfo: cacheSnapshot
       })
     } catch (error) {
       console.error('[releases/quality] Debug error:', error)
