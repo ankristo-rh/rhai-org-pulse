@@ -12,6 +12,7 @@ const ipaClient = require('./ipa-client');
 const { fetchSheetData } = require('./sheets');
 const { enrichPerson } = require('./merge');
 const { inferUsernames } = require('./username-inference');
+const { validateAmbiguousUsernames } = require('./username-validation');
 const { mergePerson, computeCoverage, processLifecycle } = require('./lifecycle');
 const { DEFAULT_EXCLUDED_TITLES } = require('./constants');
 
@@ -92,6 +93,31 @@ async function runConsolidatedSync(storage) {
       }
     } finally {
       conn.client.unbind(function() {});
+    }
+
+    // ─── Phase 1b: Validate ambiguous GitHub/GitLab usernames via API ───
+    var allLdapPeople = [];
+    var seenUids = new Set();
+    var ldapOrgKeys = Object.keys(ldapOrgs);
+    for (var li = 0; li < ldapOrgKeys.length; li++) {
+      var org = ldapOrgs[ldapOrgKeys[li]];
+      if (!seenUids.has(org.leader.uid)) {
+        allLdapPeople.push(org.leader);
+        seenUids.add(org.leader.uid);
+      }
+      for (var lj = 0; lj < org.members.length; lj++) {
+        if (!seenUids.has(org.members[lj].uid)) {
+          allLdapPeople.push(org.members[lj]);
+          seenUids.add(org.members[lj].uid);
+        }
+      }
+    }
+
+    var validationStats = { githubValidated: 0, gitlabValidated: 0, githubCleared: 0, gitlabCleared: 0 };
+    try {
+      validationStats = await validateAmbiguousUsernames(allLdapPeople);
+    } catch (err) {
+      console.warn('[consolidated-sync] Username validation failed (continuing): ' + err.message);
     }
 
     // ─── Phase 2: Google Sheets enrichment (on temp roster-shaped structure) ───
@@ -441,6 +467,10 @@ async function runConsolidatedSync(storage) {
         sheetsEnriched: sheetsData ? sheetsData.size : 0,
         githubInferred: usernamesInferred.github,
         gitlabInferred: usernamesInferred.gitlab,
+        githubValidated: validationStats.githubValidated,
+        gitlabValidated: validationStats.gitlabValidated,
+        githubCleared: validationStats.githubCleared,
+        gitlabCleared: validationStats.gitlabCleared,
         auxiliaryResolved: auxiliaryResolved,
         auxiliaryManagersAdded: auxiliaryManagersAdded,
         unresolvedPersonRefs: unresolvedPersonRefs
