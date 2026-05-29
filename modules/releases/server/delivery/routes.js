@@ -188,7 +188,69 @@ function safeDaysBetween(fromDate, toDate) {
   return Math.max(0, days)
 }
 
+/**
+ * Discovers releases by querying Jira and extracting unique Target Version values.
+ * Enriches with metadata from storage (product names, dates).
+ * Returns releases in the same format as Product Pages.
+ */
+async function discoverReleasesFromJira(storage, config) {
+  // Query Jira using the configured Target Version JQL
+  const jqlClause = getDefaultFixVersionJql(config)
+  if (!jqlClause) return []
+
+  const projectsFilter = config.jiraAllProjects
+    ? ''
+    : `project in (${config.projectKeys.map(k => `"${k}"`).join(', ')}) AND `
+  const jql = `${projectsFilter}issuetype = Feature AND ${jqlClause} ORDER BY updated DESC`
+
+  const issues = await fetchAllJqlResults(jiraRequest, jql, FIX_VERSION_FIELD_KEY, { maxResults: 100 })
+
+  // Extract unique Target Version values
+  const releaseVersions = new Set()
+  const featureCounts = new Map()
+
+  for (const issue of issues) {
+    const fixVersions = extractFixVersions(issue)
+    for (const version of fixVersions) {
+      releaseVersions.add(version)
+      featureCounts.set(version, (featureCounts.get(version) || 0) + 1)
+    }
+  }
+
+  // Load metadata from storage
+  const metadata = storage.readFromStorage('releases/delivery/releases-metadata.json') || {}
+
+  // Build releases array with metadata
+  const releases = []
+  for (const version of releaseVersions) {
+    const meta = metadata[version] || {}
+    releases.push({
+      productName: meta.productName || version.split('-')[0] || 'Unknown',
+      releaseNumber: version,
+      dueDate: meta.dueDate || null,
+      codeFreezeDate: meta.codeFreezeDate || null,
+      featureCount: featureCounts.get(version) || 0
+    })
+  }
+
+  return releases
+}
+
 async function fetchOpenReleases(storage, config) {
+  // Priority 1: Jira-discovered releases with metadata
+  if (config.targetVersionJqlFragment) {
+    try {
+      const releases = await discoverReleasesFromJira(storage, config)
+      if (releases.length > 0) {
+        return releases
+      }
+    } catch (err) {
+      console.error('[releases/delivery] Jira release discovery failed:', err.message)
+    }
+    // Fall through to other methods on failure
+  }
+
+  // Priority 2: product shortnames configured
   // New path: product shortnames configured
   if (config.productPagesProductShortnames?.length) {
     try {
@@ -1654,6 +1716,91 @@ module.exports = function registerRoutes(router, context) {
       })
     } catch (error) {
       console.error('[releases/quality] Debug error:', error)
+      res.status(500).json({ error: error.message })
+    }
+  })
+
+  /**
+   * @openapi
+   * /api/modules/releases/delivery/discover-releases:
+   *   post:
+   *     tags: ['Releases: Delivery']
+   *     summary: Discover releases from Jira Target Version field
+   *     description: Queries Jira using configured Target Version JQL and returns unique release versions with feature counts
+   *     responses:
+   *       200:
+   *         description: List of discovered releases
+   */
+  router.post('/discover-releases', requireAdmin, requireScope('releases:write'), async function(req, res) {
+    try {
+      const config = getConfig(readFromStorage)
+      const releases = await discoverReleasesFromJira(storage, config)
+      res.json({ releases })
+    } catch (error) {
+      console.error('[releases/delivery] Discover releases error:', error)
+      res.status(500).json({ error: error.message })
+    }
+  })
+
+  /**
+   * @openapi
+   * /api/modules/releases/delivery/releases-metadata:
+   *   get:
+   *     tags: ['Releases: Delivery']
+   *     summary: Get releases metadata
+   *     description: Returns stored metadata for releases (product names, dates)
+   *     responses:
+   *       200:
+   *         description: Releases metadata object
+   */
+  router.get('/releases-metadata', requireScope('releases:read'), function(req, res) {
+    try {
+      const metadata = readFromStorage('releases/delivery/releases-metadata.json') || {}
+      res.json(metadata)
+    } catch (error) {
+      console.error('[releases/delivery] Get metadata error:', error)
+      res.status(500).json({ error: error.message })
+    }
+  })
+
+  /**
+   * @openapi
+   * /api/modules/releases/delivery/releases-metadata:
+   *   post:
+   *     tags: ['Releases: Delivery']
+   *     summary: Save releases metadata
+   *     description: Stores metadata for releases (product names, dates)
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             additionalProperties:
+   *               type: object
+   *               properties:
+   *                 productName:
+   *                   type: string
+   *                 dueDate:
+   *                   type: string
+   *                   format: date
+   *                 codeFreezeDate:
+   *                   type: string
+   *                   format: date
+   *     responses:
+   *       200:
+   *         description: Metadata saved successfully
+   */
+  router.post('/releases-metadata', requireAdmin, requireScope('releases:write'), function(req, res) {
+    try {
+      const metadata = req.body
+      if (typeof metadata !== 'object' || Array.isArray(metadata)) {
+        return res.status(400).json({ error: 'Metadata must be an object' })
+      }
+      writeToStorage('releases/delivery/releases-metadata.json', metadata)
+      res.json({ success: true })
+    } catch (error) {
+      console.error('[releases/delivery] Save metadata error:', error)
       res.status(500).json({ error: error.message })
     }
   })
