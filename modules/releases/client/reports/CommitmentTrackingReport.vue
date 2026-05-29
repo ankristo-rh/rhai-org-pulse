@@ -17,17 +17,26 @@
 
     <!-- Data refresh section -->
     <div class="bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 p-3 mb-4">
-      <div class="flex items-center gap-3">
-        <button
-          @click="refreshCurrentStatus"
-          :disabled="refreshing"
-          class="px-3 py-1.5 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {{ refreshing ? 'Refreshing...' : 'Refresh Current Status' }}
-        </button>
-        <span v-if="lastRefresh" class="text-xs text-gray-500 dark:text-gray-400">
-          Updated {{ lastRefresh }}
-        </span>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <button
+            @click="refreshCurrentStatus"
+            :disabled="refreshing"
+            class="px-3 py-1.5 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ refreshing ? 'Refreshing...' : 'Refresh Current Status' }}
+          </button>
+          <span v-if="lastRefresh" class="text-xs text-gray-500 dark:text-gray-400">
+            Updated {{ lastRefresh }}
+          </span>
+          <span v-if="refreshError" class="text-xs text-red-600 dark:text-red-400">
+            {{ refreshError }}
+          </span>
+        </div>
+        <div v-if="cacheAge !== null" class="text-xs" :class="cacheIsStale ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
+          <span v-if="cacheIsStale">⚠ Data is {{ cacheAge }}h old</span>
+          <span v-else>Cache: {{ cacheAge }}h old</span>
+        </div>
       </div>
     </div>
 
@@ -67,9 +76,14 @@
       <div v-if="selectedVersion && selectedPhase && !data && !loading && error?.includes('No snapshot')"
            class="border-t border-gray-200 dark:border-gray-700 pt-3">
         <div class="flex items-center justify-between">
-          <p class="text-sm text-gray-600 dark:text-gray-400">
-            No baseline snapshot exists for <span class="font-medium">{{ selectedVersion }} {{ selectedPhase }}</span>
-          </p>
+          <div>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              No baseline snapshot exists for <span class="font-medium">{{ selectedVersion }} {{ selectedPhase }}</span>
+            </p>
+            <p v-if="snapshotError" class="text-xs text-red-600 dark:text-red-400 mt-1">
+              {{ snapshotError }}
+            </p>
+          </div>
           <button
             @click="createSnapshot"
             :disabled="creatingSnapshot"
@@ -310,6 +324,10 @@ const selectedPhase = ref('')
 const refreshing = ref(false)
 const lastRefresh = ref(null)
 const creatingSnapshot = ref(false)
+const refreshError = ref(null)
+const snapshotError = ref(null)
+const cacheAge = ref(null)
+const cacheIsStale = ref(false)
 const expandedSections = ref({
   delivered: false,
   added: false,
@@ -369,16 +387,36 @@ function goBack() {
 
 async function refreshCurrentStatus() {
   refreshing.value = true
+  refreshError.value = null
+  const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+
   try {
-    const response = await fetch('/api/modules/releases/delivery/refresh', { method: 'POST' })
-    if (!response.ok) throw new Error('Refresh failed')
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Refresh timed out after 10 minutes. Try again or check server logs.')), TIMEOUT_MS)
+    })
+
+    // Race between fetch and timeout
+    const fetchPromise = fetch('/api/modules/releases/delivery/refresh', { method: 'POST' })
+    const response = await Promise.race([fetchPromise, timeoutPromise])
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Server error: ${response.status}`)
+    }
+
     lastRefresh.value = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+
+    // Reload releases list to pick up any new versions
+    await loadReleases()
+
     // Reload current commitment data if version/phase selected
     if (selectedVersion.value && selectedPhase.value) {
       await loadCommitment(selectedVersion.value, selectedPhase.value)
     }
   } catch (err) {
-    console.error('Failed to refresh current status:', err)
+    console.error('[CommitmentTracking] Refresh failed:', err)
+    refreshError.value = err.message
   } finally {
     refreshing.value = false
   }
@@ -387,22 +425,43 @@ async function refreshCurrentStatus() {
 async function createSnapshot() {
   if (!selectedVersion.value || !selectedPhase.value) return
   creatingSnapshot.value = true
+  snapshotError.value = null
   try {
     const response = await fetch(`/api/modules/releases/delivery/commitment/snapshot/${selectedVersion.value}/${selectedPhase.value}`, {
       method: 'POST'
     })
-    if (!response.ok) throw new Error('Failed to create snapshot')
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Server error: ${response.status}`)
+    }
     // Reload commitment data to show the new snapshot
     await loadCommitment(selectedVersion.value, selectedPhase.value)
   } catch (err) {
-    console.error('Failed to create snapshot:', err)
-    alert('Failed to create snapshot: ' + err.message)
+    console.error('[CommitmentTracking] Snapshot creation failed:', err)
+    snapshotError.value = err.message
   } finally {
     creatingSnapshot.value = false
   }
 }
 
+async function checkCacheAge() {
+  try {
+    const response = await fetch('/api/modules/releases/delivery/refresh/status')
+    if (!response.ok) return
+    const status = await response.json()
+    if (status.lastRun) {
+      const ageMs = Date.now() - new Date(status.lastRun).getTime()
+      const ageHours = Math.floor(ageMs / (1000 * 60 * 60))
+      cacheAge.value = ageHours
+      cacheIsStale.value = ageHours > 24
+    }
+  } catch (err) {
+    console.error('[CommitmentTracking] Failed to check cache age:', err)
+  }
+}
+
 onMounted(() => {
   loadReleases()
+  checkCacheAge()
 })
 </script>

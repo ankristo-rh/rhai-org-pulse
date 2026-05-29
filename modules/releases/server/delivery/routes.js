@@ -10,9 +10,9 @@ const FIX_VERSION_FIELD_KEY = 'fixVersions'
 
 function getDefaultFixVersionJql(config) {
   if (config.targetVersionJqlFragment) return config.targetVersionJqlFragment
-  // Include both fixVersion and Target Version custom field
-  // Using the exact JQL syntax from the example
-  return '(fixVersion is not EMPTY OR "Target Version[Version Picker (multiple versions)]" is not EMPTY)'
+  // Fallback: match any Target Version that looks like a version number (3.x, 4.x, etc.)
+  // This auto-discovers future versions without manual config updates
+  return 'cf[10855] is not EMPTY'
 }
 
 function normalizeText(value) {
@@ -1441,20 +1441,25 @@ module.exports = function registerRoutes(router, context) {
     try {
       const { version, phase } = req.params
 
+      console.log(`[releases/delivery] Creating snapshot for ${version} ${phase}`)
+
       // Validate phase
       const validPhases = ['EA1', 'EA2', 'GA']
       if (!validPhases.includes(phase)) {
+        console.warn(`[releases/delivery] Invalid phase: ${phase}`)
         return res.status(400).json({ error: `Invalid phase. Must be one of: ${validPhases.join(', ')}` })
       }
 
       // Validate version format
       if (!/^\d+\.\d+$/.test(version)) {
+        console.warn(`[releases/delivery] Invalid version format: ${version}`)
         return res.status(400).json({ error: 'Invalid version format. Expected X.Y (e.g., "3.5")' })
       }
 
       // Load delivery analysis
       const analysisCache = readFromStorage('releases/delivery/analysis-cache.json')
       if (!analysisCache?.data) {
+        console.error('[releases/delivery] No delivery analysis cache found')
         return res.status(404).json({ error: 'Delivery analysis data not available. Run "Refresh Current Status" first.' })
       }
 
@@ -1464,8 +1469,11 @@ module.exports = function registerRoutes(router, context) {
       const matchingReleases = analysisCache.data.releases.filter(r => versionPattern.test(r.releaseNumber))
 
       if (matchingReleases.length === 0) {
-        return res.status(404).json({ error: `No releases found matching version ${version}` })
+        console.warn(`[releases/delivery] No releases found matching version ${version}`)
+        return res.status(404).json({ error: `No releases found matching version ${version}. Run "Refresh Current Status" to load latest Jira data.` })
       }
+
+      console.log(`[releases/delivery] Found ${matchingReleases.length} releases matching ${version}: ${matchingReleases.map(r => r.releaseNumber).join(', ')}`)
 
       // Collect all Features from matching releases
       const features = []
