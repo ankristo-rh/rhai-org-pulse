@@ -1,22 +1,27 @@
 <template>
-  <div class="flex flex-wrap items-center gap-2">
+  <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide border-b border-gray-100 dark:border-gray-700/50 px-4">
     <button
       @click="$emit('filter', null)"
-      class="px-3 py-1.5 text-xs font-medium rounded-full border transition-colors cursor-pointer"
+      class="relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors cursor-pointer"
       :class="!active
-        ? 'bg-primary-600 text-white border-primary-600'
-        : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500'"
+        ? 'text-gray-900 dark:text-gray-100'
+        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
     >
       All
+      <span v-if="!active" class="absolute bottom-0 left-3 right-3 h-0.5 bg-primary-600 dark:bg-primary-400 rounded-full"></span>
     </button>
     <button
       v-for="l in labels"
       :key="l.key"
       @click="$emit('filter', l.key)"
-      class="px-3 py-1.5 text-xs font-medium rounded-full border transition-colors cursor-pointer"
-      :class="active === l.key ? l.activeClasses : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500'"
+      class="relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors cursor-pointer"
+      :class="active === l.key
+        ? 'text-gray-900 dark:text-gray-100'
+        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
     >
-      {{ l.icon }} {{ l.display }}
+      <span class="text-xs">{{ l.icon }}</span>
+      <span>{{ l.display }}</span>
+      <span v-if="active === l.key" class="absolute bottom-0 left-3 right-3 h-0.5 rounded-full" :class="l.indicatorColor"></span>
     </button>
   </div>
 </template>
@@ -29,10 +34,15 @@ defineProps({
 defineEmits(['filter'])
 
 const labels = [
-  { key: 'win', display: 'Wins', icon: '🏆', activeClasses: 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' },
-  { key: 'til', display: 'TIL', icon: '💡', activeClasses: 'bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700' },
-  { key: 'customer-success', display: 'Customer', icon: '🤝', activeClasses: 'bg-green-50 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700' },
-  { key: 'question', display: 'Questions', icon: '❓', activeClasses: 'bg-orange-50 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700' },
-  { key: 'milestone', display: 'Milestones', icon: '🎯', activeClasses: 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700' }
+  { key: 'win', display: 'Wins', icon: '🏆', indicatorColor: 'bg-amber-500' },
+  { key: 'til', display: 'TIL', icon: '💡', indicatorColor: 'bg-purple-500' },
+  { key: 'customer-success', display: 'Customer', icon: '🤝', indicatorColor: 'bg-green-500' },
+  { key: 'question', display: 'Questions', icon: '❓', indicatorColor: 'bg-orange-500' },
+  { key: 'milestone', display: 'Milestones', icon: '🎯', indicatorColor: 'bg-blue-500' }
 ]
 </script>
+
+<style scoped>
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+</style>

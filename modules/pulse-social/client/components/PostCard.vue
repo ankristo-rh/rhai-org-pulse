@@ -2,98 +2,92 @@
   <article
     role="article"
     :aria-labelledby="'post-author-' + post.id"
-    class="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200"
-    :class="[borderClass, pinnedClass, highlightClass]"
+    class="px-5 py-5 transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+    :class="[highlightClass]"
     :data-post-id="post.id"
-    @mouseenter="hovered = true"
-    @mouseleave="hovered = false"
   >
-    <div class="p-5">
-      <!-- Author row -->
-      <div class="flex items-start justify-between mb-3">
-        <div class="flex items-start gap-3">
-          <PersonAvatar :name="post.author_name" :uid="post.author_uid" size="md" />
-          <div>
-            <div :id="'post-author-' + post.id" class="font-medium text-gray-900 dark:text-gray-100 text-[15px]">
-              {{ post.author_name }}
-            </div>
-            <div class="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-              <span v-if="post.author_team">{{ post.author_team }}</span>
-              <span v-if="post.author_team && post.label" class="text-gray-300 dark:text-gray-600">&middot;</span>
-              <LabelBadge :label="post.label" :resolved="!!post.resolved" />
-            </div>
+    <div class="flex gap-3.5">
+      <!-- Avatar column -->
+      <div class="shrink-0">
+        <PersonAvatar :name="post.author_name" :uid="post.author_uid" size="lg" />
+      </div>
+
+      <!-- Content column -->
+      <div class="flex-1 min-w-0">
+        <!-- Author row -->
+        <div class="flex items-center gap-2 mb-1">
+          <span :id="'post-author-' + post.id" class="font-semibold text-[15px] text-gray-900 dark:text-gray-100 truncate">
+            {{ post.author_name }}
+          </span>
+          <span v-if="post.author_team" class="text-sm text-gray-500 dark:text-gray-400 truncate hidden sm:inline">{{ post.author_team }}</span>
+          <LabelBadge v-if="post.label" :label="post.label" :resolved="!!post.resolved" />
+          <span class="text-gray-300 dark:text-gray-600 hidden sm:inline">&middot;</span>
+          <time :datetime="post.created_at" :title="fullDate" class="text-xs text-gray-400 dark:text-gray-500 shrink-0">{{ relativeTime }}</time>
+          <span v-if="post.pinned" class="text-xs" title="Pinned">📌</span>
+          <span v-if="post.edited_at" class="text-xs text-gray-400">(edited)</span>
+        </div>
+
+        <!-- Body -->
+        <div class="text-[15px] text-gray-800 dark:text-gray-200 leading-relaxed mt-1.5">
+          <div v-if="truncated && !expanded" class="line-clamp-4 post-fade">
+            <MarkdownRenderer :content="post.body" />
           </div>
+          <div v-else>
+            <MarkdownRenderer :content="post.body" />
+          </div>
+          <button
+            v-if="truncated && !expanded"
+            @click="expanded = true"
+            class="text-primary-600 dark:text-primary-400 text-sm font-medium hover:underline mt-0.5 cursor-pointer"
+          >
+            Show more
+          </button>
         </div>
-        <div class="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 shrink-0">
-          <span v-if="post.pinned" title="Pinned">📌</span>
-          <span v-if="post.edited_at" title="Edited">(edited)</span>
-          <time :datetime="post.created_at" :title="fullDate">{{ relativeTime }}</time>
-        </div>
-      </div>
 
-      <!-- Body -->
-      <div class="text-[15px] text-gray-800 dark:text-gray-200 leading-relaxed">
-        <div v-if="truncated && !expanded" class="line-clamp-4">
-          <MarkdownRenderer :content="post.body" />
-        </div>
-        <div v-else>
-          <MarkdownRenderer :content="post.body" />
-        </div>
-        <button
-          v-if="truncated && !expanded"
-          @click="expanded = true"
-          class="text-primary-600 dark:text-primary-400 text-sm font-medium hover:underline mt-1 cursor-pointer"
-        >
-          Read more
-        </button>
-      </div>
+        <!-- Attachments -->
+        <AttachmentPreview v-if="post.attachments?.length" :attachments="post.attachments" />
 
-      <!-- Attachments -->
-      <AttachmentPreview v-if="post.attachments?.length" :attachments="post.attachments" />
-
-      <!-- Reactions + Comment count -->
-      <div class="mt-4">
+        <!-- Action bar (Twitter-style, always visible) -->
         <ReactionBar
           :reactions="post.reactions || {}"
           :comment-count="post.comment_count"
           :post-id="post.id"
-          :hovered="hovered"
           @toggle="handleReaction"
           @view-comments="toggleComments"
+          class="mt-1"
         />
-      </div>
-    </div>
 
-    <!-- Inline comments section (LinkedIn-style) -->
-    <div v-if="showComments" class="border-t border-gray-100 dark:border-gray-700 px-5 py-4 bg-gray-50/50 dark:bg-gray-800/80">
-      <!-- Recent comments -->
-      <div v-if="visibleComments.length > 0" class="space-y-3 mb-3">
-        <div v-for="comment in visibleComments" :key="comment.id" class="flex items-start gap-2.5">
-          <PersonAvatar :name="comment.author_name" :uid="comment.author_uid" size="xs" />
-          <div class="flex-1 min-w-0 bg-white dark:bg-gray-700 rounded-lg px-3 py-2">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-medium text-gray-900 dark:text-gray-100">{{ comment.author_name }}</span>
-              <time class="text-[10px] text-gray-400 dark:text-gray-500">{{ formatTime(comment.created_at) }}</time>
-              <span v-if="comment.edited_at" class="text-[10px] text-gray-400">(edited)</span>
-            </div>
-            <div class="text-sm text-gray-700 dark:text-gray-300 mt-0.5 leading-relaxed">
-              <MarkdownRenderer :content="comment.body" />
+        <!-- Inline comments (collapsed: 1 preview + input) -->
+        <div v-if="showComments" class="mt-4 animate-slideDown">
+          <!-- Recent comments -->
+          <div v-if="visibleComments.length > 0" class="space-y-2 mb-2">
+            <div v-for="comment in visibleComments" :key="comment.id" class="flex items-start gap-2">
+              <PersonAvatar :name="comment.author_name" :uid="comment.author_uid" size="xs" />
+              <div class="flex-1 min-w-0">
+                <div class="inline">
+                  <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ comment.author_name }}</span>
+                  <span class="text-sm text-gray-700 dark:text-gray-300 ml-1"><MarkdownRenderer :content="comment.body" /></span>
+                </div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <time class="text-[10px] text-gray-400">{{ formatTime(comment.created_at) }}</time>
+                </div>
+              </div>
             </div>
           </div>
+
+          <!-- View all link -->
+          <button
+            v-if="post.comment_count > visibleComments.length"
+            @click="$emit('open-post', post.id)"
+            class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline cursor-pointer mb-2"
+          >
+            View all {{ post.comment_count }} replies &rarr;
+          </button>
+
+          <!-- Quick reply input -->
+          <InlineComment @submit="handleAddComment" />
         </div>
       </div>
-
-      <!-- View all comments link -->
-      <button
-        v-if="post.comment_count > visibleComments.length"
-        @click="$emit('open-post', post.id)"
-        class="text-xs text-primary-600 dark:text-primary-400 hover:underline cursor-pointer mb-3"
-      >
-        View all {{ post.comment_count }} comments
-      </button>
-
-      <!-- Inline comment input -->
-      <InlineComment @submit="handleAddComment" />
     </div>
   </article>
 </template>
@@ -114,14 +108,13 @@ const props = defineProps({
 
 const emit = defineEmits(['open-post', 'react', 'comment'])
 
-const hovered = ref(false)
 const expanded = ref(false)
 const showComments = ref(false)
 const localComments = ref([])
 
 const truncated = computed(() => {
   if (!props.post.body) return false
-  return props.post.body.length > 400 || (props.post.body.match(/\n/g) || []).length > 4
+  return props.post.body.length > 300 || (props.post.body.match(/\n/g) || []).length > 4
 })
 
 const visibleComments = computed(() => {
@@ -129,17 +122,7 @@ const visibleComments = computed(() => {
   return [...recent, ...localComments.value]
 })
 
-const LABEL_BORDERS = {
-  'win': 'border-l-[3px] border-l-amber-400 dark:border-l-amber-500',
-  'customer-success': 'border-l-[3px] border-l-green-400 dark:border-l-green-500',
-  'til': 'border-l-[3px] border-l-purple-400 dark:border-l-purple-500',
-  'question': 'border-l-[3px] border-l-orange-400 dark:border-l-orange-500',
-  'milestone': 'border-l-[3px] border-l-blue-400 dark:border-l-blue-500'
-}
-
-const borderClass = computed(() => LABEL_BORDERS[props.post.label] || '')
-const pinnedClass = computed(() => props.post.pinned ? 'bg-primary-50/50 dark:bg-primary-900/10' : '')
-const highlightClass = computed(() => props.highlight ? 'ring-2 ring-primary-300 dark:ring-primary-600 animate-highlight' : '')
+const highlightClass = computed(() => props.highlight ? 'post-highlight' : '')
 
 const fullDate = computed(() => new Date(props.post.created_at).toLocaleString())
 
@@ -148,15 +131,13 @@ const relativeTime = computed(() => {
   const created = new Date(props.post.created_at).getTime()
   const diff = now - created
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'just now'
+  if (minutes < 1) return 'now'
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d`
-  const weeks = Math.floor(days / 7)
-  if (weeks < 4) return `${weeks}w`
-  return new Date(props.post.created_at).toLocaleDateString()
+  return new Date(props.post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 })
 
 function formatTime(dateStr) {
@@ -164,13 +145,13 @@ function formatTime(dateStr) {
   const created = new Date(dateStr).getTime()
   const diff = now - created
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'just now'
+  if (minutes < 1) return 'now'
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d`
-  return new Date(dateStr).toLocaleDateString()
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function toggleComments() {
@@ -188,18 +169,30 @@ function handleAddComment(body) {
     author_uid: '',
     author_name: 'You',
     body,
-    created_at: new Date().toISOString(),
-    edited_at: null
+    created_at: new Date().toISOString()
   })
 }
 </script>
 
 <style scoped>
-@keyframes highlightFade {
-  0% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
-  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+.post-highlight {
+  animation: highlightGlow 2s ease-out forwards;
 }
-.animate-highlight {
-  animation: highlightFade 1s ease-out forwards;
+@keyframes highlightGlow {
+  0% { background-color: rgba(59, 130, 246, 0.08); }
+  100% { background-color: transparent; }
+}
+
+.post-fade {
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+}
+
+.animate-slideDown {
+  animation: slideDown 200ms ease-out;
+}
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; transform: translateY(-4px); }
+  to { opacity: 1; max-height: 500px; transform: translateY(0); }
 }
 </style>
