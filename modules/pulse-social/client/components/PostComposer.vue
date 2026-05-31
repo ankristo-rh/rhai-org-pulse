@@ -206,6 +206,15 @@ let expandedAt = 0
 const userName = ref('You')
 const userUid = ref('')
 
+function normalizeReactions(reactions) {
+  if (!reactions || typeof reactions !== 'object') return {}
+  const normalized = {}
+  for (const [emoji, value] of Object.entries(reactions)) {
+    normalized[emoji] = Array.isArray(value) ? value.length : value
+  }
+  return normalized
+}
+
 onMounted(() => {
   if (user.value) {
     userName.value = user.value.name || user.value.email || 'You'
@@ -470,12 +479,18 @@ async function handleSubmit() {
     try {
       const { apiRequest } = await import('@shared/client/services/api')
       finalPost = await apiRequest(`/modules/pulse-social/posts/${post.id}`)
-      finalPost.reactions = {}
-      finalPost.comment_count = 0
-      finalPost.recent_comments = []
     } catch {
       // Fall back to original post data
     }
+  }
+
+  finalPost = {
+    ...finalPost,
+    reactions: normalizeReactions(finalPost.reactions),
+    comment_count: Array.isArray(finalPost.comments) ? finalPost.comments.length : (finalPost.comment_count || 0),
+    reaction_count: finalPost.reaction_count || 0,
+    recent_comments: finalPost.recent_comments || [],
+    attachments: finalPost.attachments || []
   }
 
   isExpanded.value = false
