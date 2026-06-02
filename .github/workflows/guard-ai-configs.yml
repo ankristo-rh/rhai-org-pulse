@@ -31,18 +31,35 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve Pull Request Metadata
+        id: metadata
+        run: |
+          # Safely calculate PR Number, Base Branch, and Head Branch depending on whether a PR or Review event triggered this
+          if [ "${{ github.event_name }}" = "pull_request_review" ]; then
+            echo "pr_number=${{ github.event.pull_request.number || github.event.review.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "base_ref=origin/${{ github.event.pull_request.base.ref || github.event.review.pull_request.base.ref }}" >> $GITHUB_OUTPUT
+            echo "head_ref=origin/${{ github.event.pull_request.head.ref || github.event.review.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "base_ref=origin/${{ github.event.pull_request.base.ref }}" >> $GITHUB_OUTPUT
+            echo "head_ref=origin/${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check if sensitive AI configs or workflows changed
         id: check_sensitive_files
         env:
-          BASE_REF: ${{ github.base_ref }}
-          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ steps.metadata.outputs.base_ref }}
+          HEAD_REF: ${{ steps.metadata.outputs.head_ref }}
         run: |
-          # Check if any sensitive files were modified (without loading all changed files into memory)
           SENSITIVE_FILES_UPDATED=false
           MODIFIED_FILES=""
+          
+          # Get list of all files changed in this PR branch comparison
+          CHANGED_FILES=$(git diff --name-only "${BASE_REF}...${HEAD_REF}")
+
           for file in $SENSITIVE_FILES; do
-            # git diff --quiet exits with 1 if there are changes, 0 if no changes
-            if ! git diff --quiet "origin/${BASE_REF}...origin/${HEAD_REF}" -- "$file"; then
+            # Handle directory trailing slashes (like .claude/) smoothly via prefix checking
+            if echo "$CHANGED_FILES" | grep -q "^$file"; then
               echo "⚠️ Sensitive file detected: $file"
               SENSITIVE_FILES_UPDATED=true
               MODIFIED_FILES="${MODIFIED_FILES}- \`${file}\`"$'\n'
@@ -51,7 +68,6 @@ jobs:
 
           echo "detected=${SENSITIVE_FILES_UPDATED}" >> $GITHUB_OUTPUT
           if [ "$SENSITIVE_FILES_UPDATED" = true ]; then
-            # Use multiline output syntax for the file list
             echo "modified_files<<EOF" >> $GITHUB_OUTPUT
             echo "$MODIFIED_FILES" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -62,7 +78,7 @@ jobs:
         if: steps.check_sensitive_files.outputs.detected == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
           MODIFIED_FILES_LIST: ${{ steps.check_sensitive_files.outputs.modified_files }}
         run: |
           # Check if we've already commented on this PR to avoid spam
@@ -78,9 +94,9 @@ jobs:
         if: steps.check_sensitive_files.outputs.detected == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
         run: |
-          # Use `gh` CLI to see who approved the PR. (This CLI is preinstalled on GitHub ubuntu runners, so this is safe.)
+          # Use `gh` CLI to see who approved the PR.
           REVIEWS=$(gh pr view "$PR_NUMBER" --json reviews -q '.reviews[] | select(.state=="APPROVED") | .author.login')
 
           APPROVED=false
