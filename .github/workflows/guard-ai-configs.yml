@@ -20,7 +20,6 @@ jobs:
     permissions:
       contents: read        # To checkout code
       pull-requests: write  # To post comments and read reviews
-      members: read         # To read members of the ALLOWED_APPROVER_TEAM
     env:
       # GitHub team allowed to approve AI config changes (format: org/team-slug)
       ALLOWED_APPROVER_TEAM: "red-hat-data-services/org-pulse-maintainers"
@@ -99,12 +98,30 @@ jobs:
             echo "ℹ️ Comment already exists (ID: $COMMENT_EXISTS), skipping duplicate comment."
           fi
 
+      - name: Generate GitHub App token
+        id: app-token
+        if: steps.check_sensitive_files.outputs.detected == 'true'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+        continue-on-error: true  # Secrets unavailable on fork PRs — approval step handles this
+
       - name: Verify Core Owner Approval
         if: steps.check_sensitive_files.outputs.detected == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ steps.metadata.outputs.pr_number }}
         run: |
+          # On fork PRs, the app token is unavailable (secrets aren't exposed).
+          # Fail with a clear message — the check will pass once a team member
+          # approves, which triggers pull_request_review in the base repo context.
+          if [ -z "$GH_TOKEN" ]; then
+            echo "⏳ Waiting for approval from a member of ${ALLOWED_APPROVER_TEAM}."
+            echo "(App token unavailable — this is expected for fork PRs.)"
+            exit 1
+          fi
+
           # Use `gh` CLI to see who approved the PR
           REVIEWS=$(gh pr view "$PR_NUMBER" --json reviews -q '.reviews[] | select(.state=="APPROVED") | .author.login')
 
