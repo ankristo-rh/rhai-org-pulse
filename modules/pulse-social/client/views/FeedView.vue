@@ -146,6 +146,16 @@
         </div>
       </div>
     </aside>
+
+    <!-- Delete confirmation modal -->
+    <ConfirmDialog
+      :visible="!!deletingPostId"
+      title="Delete this post?"
+      message="This will permanently delete the post and all its comments. This can't be undone."
+      confirm-label="Delete"
+      @confirm="confirmDeletePost"
+      @cancel="deletingPostId = null"
+    />
   </div>
 </template>
 
@@ -156,6 +166,7 @@ import PostCard from '../components/PostCard.vue'
 import TimeGroup from '../components/TimeGroup.vue'
 import EmptyFeed from '../components/EmptyFeed.vue'
 import FeedSkeleton from '../components/FeedSkeleton.vue'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useFeed } from '../composables/useFeed'
 import { useReactions } from '../composables/useReactions'
 
@@ -163,6 +174,7 @@ const nav = inject('moduleNav')
 const feed = useFeed()
 const { toggleReaction } = useReactions()
 const highlightedPostId = ref(null)
+const deletingPostId = ref(null)
 
 const stats = ref({ postsThisWeek: 0, totalReactions: 0, postersThisWeek: 0, totalComments: 0 })
 const trendingLabels = ref([])
@@ -274,7 +286,12 @@ function focusComposer() {
 }
 
 async function handleDeletePost(postId) {
-  if (!confirm('Delete this post? This cannot be undone.')) return
+  deletingPostId.value = postId
+}
+
+async function confirmDeletePost() {
+  const postId = deletingPostId.value
+  deletingPostId.value = null
   try {
     const { apiRequest } = await import('@shared/client/services/api')
     await apiRequest(`/modules/pulse-social/posts/${postId}`, { method: 'DELETE' })
