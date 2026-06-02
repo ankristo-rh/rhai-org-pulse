@@ -81,14 +81,14 @@ jobs:
           # Use `gh` CLI to see who approved the PR. (This CLI is preinstalled on GitHub ubuntu runners, so this is safe.)
           REVIEWS=$(gh pr view ${{ github.event.pull_request.number }} --json reviews -q '.reviews[] | select(.state=="APPROVED") | .author.login')
 
-          # Check if any allowed approver has approved
           APPROVED=false
+          for approver in $ALLOWED_APPROVERS; do
             if echo "$REVIEWS" | grep -qx "$approver"; then
-            if echo "$REVIEWS" | grep -q "$approver"; then
               echo "✅ Approved by @$approver. This PR can be merged to main."
               APPROVED=true
               break
             fi
+          done
           done
 
           if [ "$APPROVED" = false ]; then
