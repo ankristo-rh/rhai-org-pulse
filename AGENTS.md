@@ -75,6 +75,7 @@ Documentation changes must land in the same PR as the code they describe:
 - **New shared exports** → update `shared/API.md`
 - **Module system changes** → update `docs/MODULES.md`
 - **API route changes** → update the API Routes section in `.claude/CLAUDE.md`
+- **Node.js version changes** → update `README.md` and `CONTRIBUTING.md` to match `package.json` engines field
 
 ## Code Style
 
