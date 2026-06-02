@@ -23,7 +23,7 @@ For real Jira and GitHub data:
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - Red Hat VPN (required for LDAP roster sync)
 - @redhat.com Google account
 
