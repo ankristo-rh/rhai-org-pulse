@@ -37,7 +37,7 @@ describe('ForYouCard', () => {
 
   it('applies green accent for green state', () => {
     const wrapper = mount(ForYouCard, {
-      props: { item: makeItem({ state: { id: 'strategy-created', label: 'Strategy Created', color: 'green', order: 4 } }) }
+      props: { item: makeItem({ state: { id: 'signed-off', label: 'Signed Off', color: 'green', order: 3 }, type: 'feature' }) }
     })
     const card = wrapper.find('div')
     expect(card.classes().some(c => c.includes('border-l-green'))).toBe(true)

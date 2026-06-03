@@ -130,7 +130,6 @@ const stageOptions = [
   { value: 'passed-with-caveats', label: 'Passed with Caveats' },
   { value: 'ready-to-advance', label: 'Ready for Feature Creation' },
   { value: 'queued-for-pipeline', label: 'Queued for Feature Creation' },
-  { value: 'strategy-created', label: 'Strategy Created' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'revise-required', label: 'Revise Required' },
   { value: 'awaiting-signoff', label: 'Awaiting Sign-off' },

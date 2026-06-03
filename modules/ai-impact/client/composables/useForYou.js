@@ -3,12 +3,11 @@ import { computed, ref } from 'vue'
 const SCOPE_LABEL = 'strat-creator-3.5'
 
 const RFE_STATES = {
-  NOT_ASSESSED: { id: 'not-assessed', label: 'Not Yet Assessed', color: 'gray', order: 5 },
+  NOT_ASSESSED: { id: 'not-assessed', label: 'Not Yet Assessed', color: 'gray', order: 4 },
   NEEDS_REVISION: { id: 'needs-revision', label: 'Needs Revision', color: 'red', order: 0 },
   PASSED_WITH_CAVEATS: { id: 'passed-with-caveats', label: 'Passed with Caveats', color: 'amber', order: 1 },
   READY_TO_ADVANCE: { id: 'ready-to-advance', label: 'Ready for Feature Creation', color: 'amber', order: 2 },
-  QUEUED_FOR_PIPELINE: { id: 'queued-for-pipeline', label: 'Queued for Feature Creation', color: 'blue', order: 3 },
-  STRATEGY_CREATED: { id: 'strategy-created', label: 'Strategy Created', color: 'green', order: 4 }
+  QUEUED_FOR_PIPELINE: { id: 'queued-for-pipeline', label: 'Queued for Feature Creation', color: 'blue', order: 3 }
 }
 
 const FEATURE_STATES = {
@@ -26,8 +25,8 @@ function classifyRfe(rfe) {
   const hasTechReviewed = labels.has('tech-reviewed')
   const hasScopeLabel = labels.has(SCOPE_LABEL)
 
-  // State 5: Strategy Created (linkedFeature overrides all)
-  if (hasLinkedFeature) return RFE_STATES.STRATEGY_CREATED
+  // Skip RFEs that already have a linked feature — they're tracked on the feature side
+  if (hasLinkedFeature) return null
 
   // State 1: Needs Revision (needs-attention WITHOUT rubric-pass)
   if (hasNeedsAttention && !hasRubricPass) return RFE_STATES.NEEDS_REVISION
@@ -174,6 +173,7 @@ export function useForYou(rosterData, user, rfeData, features, assessments, fiel
 
     for (const rfe of filteredRfes) {
       const state = classifyRfe(rfe)
+      if (!state) continue // Skip RFEs with linked features
       const assessment = assessments.value?.[rfe.key]
       const waitDays = computeWaitDays(
         { ...rfe, assessedAt: assessment?.assessedAt },
@@ -266,7 +266,7 @@ export function useForYou(rosterData, user, rfeData, features, assessments, fiel
   const everythingElse = computed(() => {
     const items = filteredItems.value.filter(i => {
       if (i.type === 'rfe') {
-        return ['queued-for-pipeline', 'not-assessed', 'strategy-created'].includes(i.state.id)
+        return ['queued-for-pipeline', 'not-assessed'].includes(i.state.id)
       }
       return i.state.id === 'signed-off'
     })
@@ -280,7 +280,6 @@ export function useForYou(rosterData, user, rfeData, features, assessments, fiel
       { ...RFE_STATES.PASSED_WITH_CAVEATS, items: [] },
       { ...RFE_STATES.READY_TO_ADVANCE, items: [] },
       { ...RFE_STATES.QUEUED_FOR_PIPELINE, items: [] },
-      { ...RFE_STATES.STRATEGY_CREATED, items: [] },
       { ...FEATURE_STATES.REJECTED, items: [] },
       { ...FEATURE_STATES.REVISE_REQUIRED, items: [] },
       { ...FEATURE_STATES.AWAITING_SIGNOFF, items: [] },

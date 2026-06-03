@@ -68,10 +68,6 @@ const columnGuidance = {
     text: 'RFEs waiting for the automated pipeline to create a strategy feature. No action needed.',
     guide: 'feature-review'
   },
-  'strategy-created': {
-    text: 'A strategy feature has been created from this RFE. The feature now goes through its own review cycle.',
-    guide: 'feature-review'
-  },
   'rejected': {
     text: 'Features the AI review recommended rejecting. Check review comments and decide whether to revise the RFE or close it.',
     guide: 'feature-review'

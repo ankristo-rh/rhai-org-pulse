@@ -119,11 +119,6 @@ const actionGuidance = computed(() => {
         linkUrl: `${guideBase}feature-review`,
         linkLabel: 'Feature Review guide'
       }
-      case 'strategy-created': return {
-        text: 'A strategy feature has been created from this RFE. The feature now goes through its own review cycle.',
-        linkUrl: `${guideBase}feature-review`,
-        linkLabel: 'Feature Review guide'
-      }
       default: return {
         text: 'This RFE hasn\'t been assessed yet. The pipeline will pick it up on its next run and score it against the quality rubric.',
         linkUrl: `${guideBase}rfe-review`,

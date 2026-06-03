@@ -13,14 +13,14 @@ import {
 import { useForYou } from '../../client/composables/useForYou.js'
 
 describe('classifyRfe', () => {
-  it('returns STRATEGY_CREATED when linkedFeature is present', () => {
+  it('returns null when linkedFeature is present (skipped)', () => {
     const rfe = { labels: [], linkedFeature: { key: 'RHAISTRAT-1' } }
-    expect(classifyRfe(rfe)).toBe(RFE_STATES.STRATEGY_CREATED)
+    expect(classifyRfe(rfe)).toBeNull()
   })
 
-  it('returns STRATEGY_CREATED even with needs-attention if linkedFeature exists', () => {
+  it('returns null even with needs-attention if linkedFeature exists', () => {
     const rfe = { labels: ['rfe-creator-needs-attention'], linkedFeature: { key: 'RHAISTRAT-1' } }
-    expect(classifyRfe(rfe)).toBe(RFE_STATES.STRATEGY_CREATED)
+    expect(classifyRfe(rfe)).toBeNull()
   })
 
   it('returns NEEDS_REVISION when needs-attention without rubric-pass', () => {
@@ -287,11 +287,11 @@ describe('boardColumns', () => {
   it('has all 10 columns', () => {
     const rfeData = ref({ issues: [] })
     const { boardColumns } = useForYou(rosterData, user, rfeData, features, assessments, fieldDefinitions)
-    expect(boardColumns.value).toHaveLength(10)
+    expect(boardColumns.value).toHaveLength(9)
     const ids = boardColumns.value.map(c => c.id)
     expect(ids).toContain('not-assessed')
     expect(ids).toContain('needs-revision')
-    expect(ids).toContain('strategy-created')
+    expect(ids).not.toContain('strategy-created')
     expect(ids).toContain('signed-off')
   })
 })
