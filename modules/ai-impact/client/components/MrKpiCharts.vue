@@ -129,8 +129,11 @@ function getISOWeek(date) {
 }
 
 const overallMaturity = computed(() => {
-  if (!mergedMrs.value.length) return null
-  const scores = mergedMrs.value.map(mr => draftMaturityScore(mr.commitCount, mr.commentCount))
+  const threeMonthsAgo = new Date()
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+  const recentMerged = mergedMrs.value.filter(mr => new Date(mr.mergedAt) >= threeMonthsAgo)
+  if (!recentMerged.length) return null
+  const scores = recentMerged.map(mr => draftMaturityScore(mr.commitCount, mr.commentCount))
   return +(scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2)
 })
 
@@ -174,7 +177,7 @@ const readinessTrendOptions = computed(() => ({
     legend: { display: false },
     tooltip: {
       callbacks: {
-        label(ctx) { return `Score: ${ctx.parsed.y}` }
+        label(ctx) { return `Score: ${Math.round(ctx.parsed.y * 100)}%` }
       }
     }
   },
