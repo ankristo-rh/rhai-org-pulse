@@ -152,25 +152,13 @@ function buildFeatureReadiness(readFromStorage) {
   var registryReleases = (registry && registry.releases) || []
 
   var versionAliasMap = {}
-  var releasedVersions = new Set()
   for (var ri = 0; ri < registryReleases.length; ri++) {
     var rel = registryReleases[ri]
     var aliases = [rel.displayName, rel.id].concat(rel.fixVersions || []).filter(Boolean)
     for (var ai = 0; ai < aliases.length; ai++) {
       versionAliasMap[aliases[ai]] = aliases
     }
-    var isArchived = rel.state === 'archived'
-    var gaDate = rel.milestones && (rel.milestones.gaDate || rel.milestones.ga)
-    var isReleased = false
-    if (gaDate) {
-      var gaTime = new Date(gaDate + 'T00:00:00Z').getTime()
-      if (!isNaN(gaTime) && Date.now() > gaTime) isReleased = true
-    }
-    if (isArchived || isReleased) {
-      for (var rvi = 0; rvi < aliases.length; rvi++) {
-        releasedVersions.add(aliases[rvi])
-      }
-    }
+
   }
 
   var configuredVersions = getConfiguredReleases(readFromStorage).map(function(r) { return r.version })
@@ -455,18 +443,6 @@ function buildFeatureReadiness(readFromStorage) {
     }
     return b.rubricTotal - a.rubricTotal
   }
-
-  function isReleasedFeature(feature) {
-    var tvs = feature.targetVersions || []
-    if (tvs.length === 0) return false
-    for (var tvi2 = 0; tvi2 < tvs.length; tvi2++) {
-      if (!releasedVersions.has(tvs[tvi2])) return false
-    }
-    return true
-  }
-
-  pendingReview = pendingReview.filter(function(f) { return !isReleasedFeature(f) })
-  ready = ready.filter(function(f) { return !isReleasedFeature(f) })
 
   pendingReview.sort(sortFeatures)
   ready.sort(sortFeatures)
