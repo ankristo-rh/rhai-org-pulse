@@ -1454,4 +1454,181 @@ describe('buildFeatureReadiness', function() {
     })
   })
 
+
+  describe('hygiene alias lookup', function() {
+    it('finds hygiene cache via registry displayName when config key differs', function() {
+      var store = makeFeaturesStore({
+        'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+      })
+      var violations = [{ id: 'stale-status-summary', name: 'Stale', category: 'timeliness', message: 'Stale' }]
+      var hygieneCache = {
+        features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'Alpha', violations: violations } }
+      }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: null }] }
+      var registryData = {
+        releases: [
+          { id: 'rhoai-3.6', displayName: 'RHOAI 3.6', fixVersions: ['RHOAI-3.6'], state: 'active', milestones: {} }
+        ]
+      }
+      var readFromStorage = makeReadFromStorage({
+        'ai-impact/features.json': store,
+        'releases/planning/config.json': CONFIG_3_6,
+        'releases/planning/health-cache-3.6-all.json': healthCache,
+        'releases/registry.json': registryData,
+        'releases/hygiene/features-RHOAI 3.6.json': hygieneCache
+      })
+      var result = buildFeatureReadiness(readFromStorage)
+      expect(result.ready[0].violations).toEqual(violations)
+    })
+
+    it('finds hygiene cache via registry id alias', function() {
+      var store = makeFeaturesStore({
+        'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+      })
+      var violations = [{ id: 'missing-assignee', name: 'No assignee', category: 'ownership', message: 'No assignee' }]
+      var hygieneCache = {
+        features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'Alpha', violations: violations } }
+      }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: null }] }
+      var registryData = {
+        releases: [
+          { id: 'rhoai-3.6', displayName: 'RHOAI 3.6', fixVersions: ['RHOAI-3.6'], state: 'active', milestones: {} }
+        ]
+      }
+      var readFromStorage = makeReadFromStorage({
+        'ai-impact/features.json': store,
+        'releases/planning/config.json': CONFIG_3_6,
+        'releases/planning/health-cache-3.6-all.json': healthCache,
+        'releases/registry.json': registryData,
+        'releases/hygiene/features-rhoai-3.6.json': hygieneCache
+      })
+      var result = buildFeatureReadiness(readFromStorage)
+      expect(result.pendingReview[0].violations).toEqual(violations)
+      expect(result.pendingReview[0].readinessGates.noBlockingViolations).toBe(false)
+    })
+
+    it('prefers direct config key match over alias', function() {
+      var store = makeFeaturesStore({
+        'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+      })
+      var directViolations = [{ id: 'stale-status-summary', name: 'Direct', category: 'timeliness', message: 'Direct' }]
+      var aliasViolations = [{ id: 'missing-assignee', name: 'Alias', category: 'ownership', message: 'Alias' }]
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: null }] }
+      var registryData = {
+        releases: [
+          { id: 'rhoai-3.6', displayName: 'RHOAI 3.6', fixVersions: [], state: 'active', milestones: {} }
+        ]
+      }
+      var readFromStorage = makeReadFromStorage({
+        'ai-impact/features.json': store,
+        'releases/planning/config.json': CONFIG_3_6,
+        'releases/planning/health-cache-3.6-all.json': healthCache,
+        'releases/registry.json': registryData,
+        'releases/hygiene/features-3.6.json': { features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'A', violations: directViolations } } },
+        'releases/hygiene/features-RHOAI 3.6.json': { features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'A', violations: aliasViolations } } }
+      })
+      var result = buildFeatureReadiness(readFromStorage)
+      expect(result.ready[0].violations).toEqual(directViolations)
+    })
+  })
+
+  describe('hygieneIndex independent of teamIndex', function() {
+    it('indexes violations separately from team across versions', function() {
+      var store = makeFeaturesStore({
+        'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+      })
+      var violations = [{ id: 'stale-status-summary', name: 'Stale', category: 'timeliness', message: 'Stale' }]
+      var config = { releases: { '3.5': { release: '3.5' }, '3.6': { release: '3.6' } } }
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: null }] }
+      var readFromStorage = makeReadFromStorage({
+        'ai-impact/features.json': store,
+        'releases/planning/config.json': config,
+        'releases/planning/health-cache-3.5-all.json': healthCache,
+        'releases/planning/health-cache-3.6-all.json': healthCache,
+        'releases/hygiene/features-3.5.json': { features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', team: 'Alpha' } } },
+        'releases/hygiene/features-3.6.json': { features: { 'RHAISTRAT-1': { key: 'RHAISTRAT-1', violations: violations } } }
+      })
+      var result = buildFeatureReadiness(readFromStorage)
+      expect(result.ready[0].team).toBe('Alpha')
+      expect(result.ready[0].violations).toEqual(violations)
+    })
+  })
+
+  describe('released version filtering', function() {
+    it('excludes features whose target versions are all archived', function() {
+      var store = makeFeaturesStore({
+        'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+      })
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: 80, targetRelease: '3.6' }] }
+      var registryData = {
+        releases: [
+          { id: 'rhoai-3.6', displayName: '3.6', fixVersions: [], state: 'archived', milestones: {} }
+        ]
+      }
+      var readFromStorage = makeReadFromStorage({
+        'ai-impact/features.json': store,
+        'releases/planning/config.json': CONFIG_3_6,
+        'releases/planning/health-cache-3.6-all.json': healthCache,
+        'releases/registry.json': registryData
+      })
+      var result = buildFeatureReadiness(readFromStorage)
+      expect(result.ready).toHaveLength(0)
+      expect(result.pendingReview).toHaveLength(0)
+    })
+
+    it('excludes features whose target versions have past GA date', function() {
+      var store = makeFeaturesStore({
+        'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+      })
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: 80, targetRelease: '3.6' }] }
+      var registryData = {
+        releases: [
+          { id: 'rhoai-3.6', displayName: '3.6', fixVersions: [], state: 'active', milestones: { ga: '2020-01-01' } }
+        ]
+      }
+      var readFromStorage = makeReadFromStorage({
+        'ai-impact/features.json': store,
+        'releases/planning/config.json': CONFIG_3_6,
+        'releases/planning/health-cache-3.6-all.json': healthCache,
+        'releases/registry.json': registryData
+      })
+      var result = buildFeatureReadiness(readFromStorage)
+      expect(result.ready).toHaveLength(0)
+      expect(result.pendingReview).toHaveLength(0)
+    })
+
+    it('includes features targeting active versions with future GA date', function() {
+      var store = makeFeaturesStore({
+        'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+      })
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: 80, targetRelease: '3.6' }] }
+      var registryData = {
+        releases: [
+          { id: 'rhoai-3.6', displayName: '3.6', fixVersions: [], state: 'active', milestones: { ga: '2099-01-01' } }
+        ]
+      }
+      var readFromStorage = makeReadFromStorage({
+        'ai-impact/features.json': store,
+        'releases/planning/config.json': CONFIG_3_6,
+        'releases/planning/health-cache-3.6-all.json': healthCache,
+        'releases/registry.json': registryData
+      })
+      var result = buildFeatureReadiness(readFromStorage)
+      expect(result.ready).toHaveLength(1)
+    })
+
+    it('includes features when no registry exists', function() {
+      var store = makeFeaturesStore({
+        'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+      })
+      var healthCache = { features: [{ key: 'RHAISTRAT-1', priorityScore: 80 }] }
+      var readFromStorage = makeReadFromStorage({
+        'ai-impact/features.json': store,
+        'releases/planning/config.json': CONFIG_3_6,
+        'releases/planning/health-cache-3.6-all.json': healthCache
+      })
+      var result = buildFeatureReadiness(readFromStorage)
+      expect(result.ready).toHaveLength(1)
+    })
+  })
 })

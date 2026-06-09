@@ -148,11 +148,52 @@ function buildFeatureReadiness(readFromStorage) {
   var teamIndex = new Map()
   var hygieneIndex = new Map()
 
+  var registry = readFromStorage('releases/registry.json')
+  var registryReleases = (registry && registry.releases) || []
+
+  var versionAliasMap = {}
+  var releasedVersions = new Set()
+  for (var ri = 0; ri < registryReleases.length; ri++) {
+    var rel = registryReleases[ri]
+    var aliases = [rel.displayName, rel.id].concat(rel.fixVersions || []).filter(Boolean)
+    for (var ai = 0; ai < aliases.length; ai++) {
+      versionAliasMap[aliases[ai]] = aliases
+    }
+    var isArchived = rel.state === 'archived'
+    var gaDate = rel.milestones && (rel.milestones.gaDate || rel.milestones.ga)
+    var isReleased = false
+    if (gaDate) {
+      var gaTime = new Date(gaDate + 'T00:00:00Z').getTime()
+      if (!isNaN(gaTime) && Date.now() > gaTime) isReleased = true
+    }
+    if (isArchived || isReleased) {
+      for (var rvi = 0; rvi < aliases.length; rvi++) {
+        releasedVersions.add(aliases[rvi])
+      }
+    }
+  }
+
   var configuredVersions = getConfiguredReleases(readFromStorage).map(function(r) { return r.version })
+
+  for (var cvi = 0; cvi < configuredVersions.length; cvi++) {
+    var cv = configuredVersions[cvi]
+    if (!versionAliasMap[cv]) {
+      for (var ri2 = 0; ri2 < registryReleases.length; ri2++) {
+        var rel2 = registryReleases[ri2]
+        var a2 = [rel2.displayName, rel2.id].concat(rel2.fixVersions || []).filter(Boolean)
+        for (var ai2 = 0; ai2 < a2.length; ai2++) {
+          if (a2[ai2].indexOf(cv) !== -1 || cv.indexOf(a2[ai2]) !== -1) {
+            versionAliasMap[cv] = a2
+            break
+          }
+        }
+        if (versionAliasMap[cv]) break
+      }
+    }
+  }
 
   for (var vi = 0; vi < configuredVersions.length; vi++) {
     var ver = configuredVersions[vi]
-
     var candidateCache = readFromStorage('releases/planning/candidates-cache-' + ver + '.json')
     if (candidateCache && candidateCache.data && Array.isArray(candidateCache.data.features)) {
       var candidates = candidateCache.data.features
@@ -172,13 +213,21 @@ function buildFeatureReadiness(readFromStorage) {
     }
 
     var hygieneData = readFromStorage('releases/hygiene/features-' + ver + '.json')
+    if (!hygieneData && versionAliasMap[ver]) {
+      var hygieneAliases = versionAliasMap[ver]
+      for (var ali = 0; ali < hygieneAliases.length && !hygieneData; ali++) {
+        if (hygieneAliases[ali] !== ver) {
+          hygieneData = readFromStorage('releases/hygiene/features-' + hygieneAliases[ali] + '.json')
+        }
+      }
+    }
     if (hygieneData && hygieneData.features) {
       var hkeys = Object.keys(hygieneData.features)
       for (var ti = 0; ti < hkeys.length; ti++) {
         var feat = hygieneData.features[hkeys[ti]]
-        if (feat && !teamIndex.has(hkeys[ti])) {
-          if (feat.team) teamIndex.set(hkeys[ti], feat.team)
-          if (feat.violations) hygieneIndex.set(hkeys[ti], feat.violations)
+        if (feat) {
+          if (!teamIndex.has(hkeys[ti]) && feat.team) teamIndex.set(hkeys[ti], feat.team)
+          if (!hygieneIndex.has(hkeys[ti]) && feat.violations) hygieneIndex.set(hkeys[ti], feat.violations)
         }
       }
     }
@@ -406,6 +455,18 @@ function buildFeatureReadiness(readFromStorage) {
     }
     return b.rubricTotal - a.rubricTotal
   }
+
+  function isReleasedFeature(feature) {
+    var tvs = feature.targetVersions || []
+    if (tvs.length === 0) return false
+    for (var tvi2 = 0; tvi2 < tvs.length; tvi2++) {
+      if (!releasedVersions.has(tvs[tvi2])) return false
+    }
+    return true
+  }
+
+  pendingReview = pendingReview.filter(function(f) { return !isReleasedFeature(f) })
+  ready = ready.filter(function(f) { return !isReleasedFeature(f) })
 
   pendingReview.sort(sortFeatures)
   ready.sort(sortFeatures)
