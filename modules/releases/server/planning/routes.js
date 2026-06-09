@@ -27,6 +27,8 @@ const { logAudit, getAuditLog, computeFieldDiff } = require('./audit-log')
 const { blockDuringImpersonation } = require('../../../../shared/server/auth')
 const healthRoutes = require('./health/health-routes')
 var { buildFeatureReadiness } = require('./feature-readiness')
+var { queryFeaturesFromJira } = require("./feature-query")
+var { fetchAllJqlResults } = require("../../../../shared/server/jira")
 
 const DEMO_MODE = process.env.DEMO_MODE === 'true'
 const DATA_PREFIX = 'releases/planning'
@@ -466,9 +468,17 @@ module.exports = function registerPlanningRoutes(router, context) {
    *       500:
    *         description: Internal error building readiness data
    */
-  router.get('/feature-readiness', requireAuth, requireScope('releases:read'), function(req, res) {
+  router.get('/feature-readiness', requireAuth, requireScope('releases:read'), async function(req, res) {
     try {
-      var result = buildFeatureReadiness(readFromStorage)
+      var jiraFeatures = null
+      if (jiraClient) {
+        try {
+          jiraFeatures = await queryFeaturesFromJira(jiraClient.jiraRequest, fetchAllJqlResults, readFromStorage)
+        } catch (jiraErr) {
+          console.warn('[releases/planning] Jira query failed, falling back to cache-only:', jiraErr.message)
+        }
+      }
+      var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
       res.json(result)
     } catch (err) {
       console.error('[releases/planning] Feature readiness build failed:', err.message)

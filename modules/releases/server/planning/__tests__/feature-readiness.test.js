@@ -1555,3 +1555,305 @@ describe('buildFeatureReadiness', function() {
   })
 
 })
+
+// ---------------------------------------------------------------------------
+// deriveHumanReviewStatusFromLabels
+// ---------------------------------------------------------------------------
+
+const { deriveHumanReviewStatusFromLabels } = require('../feature-readiness')
+
+describe('deriveHumanReviewStatusFromLabels', function() {
+  it('returns approved when sign-off label present', function() {
+    expect(deriveHumanReviewStatusFromLabels(['strat-creator-human-sign-off'])).toBe('approved')
+  })
+
+  it('returns needs-review when needs-attention label present', function() {
+    expect(deriveHumanReviewStatusFromLabels(['strat-creator-needs-attention'])).toBe('needs-review')
+  })
+
+  it('returns awaiting-review for other labels', function() {
+    expect(deriveHumanReviewStatusFromLabels(['some-label'])).toBe('awaiting-review')
+  })
+
+  it('returns awaiting-review for empty array', function() {
+    expect(deriveHumanReviewStatusFromLabels([])).toBe('awaiting-review')
+  })
+
+  it('returns awaiting-review for null', function() {
+    expect(deriveHumanReviewStatusFromLabels(null)).toBe('awaiting-review')
+  })
+
+  it('sign-off takes precedence over needs-attention', function() {
+    expect(deriveHumanReviewStatusFromLabels(['strat-creator-needs-attention', 'strat-creator-human-sign-off'])).toBe('approved')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Pass 3: Jira-only features
+// ---------------------------------------------------------------------------
+
+describe('buildFeatureReadiness — pass 3 (Jira-only features)', function() {
+  function makeJiraFeature(key, overrides) {
+    return Object.assign({
+      key: key,
+      summary: 'Jira Feature ' + key,
+      status: 'In Progress',
+      priority: 'Major',
+      assignee: 'Jane Doe',
+      components: ['UI'],
+      labels: [],
+      targetVersions: ['rhoai-3.6'],
+      fixVersions: [],
+      team: 'Platform'
+    }, overrides)
+  }
+
+  it('includes Jira-only features not in caches or ai-impact', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-999', makeJiraFeature('RHAISTRAT-999'))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    expect(result.meta.total).toBe(1)
+    expect(result.pendingReview[0].key).toBe('RHAISTRAT-999')
+    expect(result.pendingReview[0].dataSource).toBe('jira')
+    expect(result.pendingReview[0].title).toBe('Jira Feature RHAISTRAT-999')
+    expect(result.pendingReview[0].priority).toBe('Major')
+    expect(result.pendingReview[0].status).toBe('In Progress')
+    expect(result.pendingReview[0].deliveryOwner).toBe('Jane Doe')
+    expect(result.pendingReview[0].team).toBe('Platform')
+    expect(result.pendingReview[0].components).toEqual(['UI'])
+    expect(result.pendingReview[0].targetVersions).toEqual(['rhoai-3.6'])
+  })
+
+  it('Jira-only feature with sign-off label and all gates passing is ready', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-888', makeJiraFeature('RHAISTRAT-888', {
+      labels: ['strat-creator-human-sign-off'],
+      assignee: 'John',
+      status: 'In Progress',
+      targetVersions: ['rhoai-3.6']
+    }))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    expect(result.ready.length).toBe(1)
+    expect(result.ready[0].key).toBe('RHAISTRAT-888')
+    expect(result.ready[0].confidence).toBe('ready')
+    expect(result.ready[0].humanReviewStatus).toBe('approved')
+  })
+
+  it('Jira-only feature with sign-off but in Refinement status is not ready', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-777', makeJiraFeature('RHAISTRAT-777', {
+      labels: ['strat-creator-human-sign-off'],
+      status: 'Refinement'
+    }))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    expect(result.pendingReview.length).toBe(1)
+    expect(result.pendingReview[0].readinessGates.pastRefinement).toBe(false)
+  })
+
+  it('Jira-only feature without assignee is not ready', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-666', makeJiraFeature('RHAISTRAT-666', {
+      labels: ['strat-creator-human-sign-off'],
+      assignee: null
+    }))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    expect(result.pendingReview.length).toBe(1)
+    expect(result.pendingReview[0].readinessGates.ownerAssigned).toBe(false)
+  })
+
+  it('Jira-only feature without target version is not ready', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-555', makeJiraFeature('RHAISTRAT-555', {
+      labels: ['strat-creator-human-sign-off'],
+      targetVersions: []
+    }))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    expect(result.pendingReview.length).toBe(1)
+    expect(result.pendingReview[0].readinessGates.hasTargetVersion).toBe(false)
+  })
+
+  it('does not duplicate features already in strat-creator pass', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-1', makeJiraFeature('RHAISTRAT-1'))
+
+    var store = makeFeaturesStore({
+      'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+    })
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': store,
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    var keys = result.pendingReview.concat(result.ready).map(function(f) { return f.key })
+    var unique = new Set(keys)
+    expect(keys.length).toBe(unique.size)
+  })
+
+  it('does not duplicate features already in health-pipeline pass', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-50', makeJiraFeature('RHAISTRAT-50'))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6,
+      'releases/planning/health-cache-3.6-all.json': {
+        features: [{ key: 'RHAISTRAT-50', summary: 'Health Feature', status: 'In Progress', priority: 'Major' }]
+      }
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    var keys = result.pendingReview.concat(result.ready).map(function(f) { return f.key })
+    var unique = new Set(keys)
+    expect(keys.length).toBe(unique.size)
+    var feature = result.pendingReview.concat(result.ready).find(function(f) { return f.key === 'RHAISTRAT-50' })
+    expect(feature.dataSource).toBe('health-pipeline')
+  })
+
+  it('populates filter metadata from Jira-only features', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-444', makeJiraFeature('RHAISTRAT-444', {
+      components: ['NewComp'],
+      team: 'NewTeam',
+      priority: 'Blocker',
+      targetVersions: ['rhoai-4.0']
+    }))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    expect(result.filterMeta.components).toContain('NewComp')
+    expect(result.filterMeta.teams).toContain('NewTeam')
+    expect(result.filterMeta.priorities).toContain('Blocker')
+    expect(result.filterMeta.targetVersions).toContain('rhoai-4.0')
+  })
+
+  it('Jira-only feature with fix version gets committed confidence', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-333', makeJiraFeature('RHAISTRAT-333', {
+      labels: ['strat-creator-human-sign-off'],
+      fixVersions: ['rhoai-3.6'],
+      assignee: 'Alice',
+      status: 'In Progress',
+      targetVersions: ['rhoai-3.6']
+    }))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    expect(result.ready[0].confidence).toBe('committed')
+    expect(result.ready[0].fixVersion).toBe('rhoai-3.6')
+  })
+
+  it('null jiraFeatures preserves backward-compatible cache-only behavior', function() {
+    var store = makeFeaturesStore({
+      'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved' }) }
+    })
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': store,
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, null)
+    expect(result.meta.total).toBe(1)
+  })
+
+  it('strat-creator pass enriches with Jira data when available', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-1', makeJiraFeature('RHAISTRAT-1', {
+      status: 'Development',
+      assignee: 'Jira Assignee',
+      components: ['JiraComp'],
+      targetVersions: ['rhoai-3.6'],
+      team: 'JiraTeam'
+    }))
+
+    var store = makeFeaturesStore({
+      'RHAISTRAT-1': { latest: makeLatest({ humanReviewStatus: 'approved', components: [] }) }
+    })
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': store,
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    var feature = result.ready.concat(result.pendingReview).find(function(f) { return f.key === 'RHAISTRAT-1' })
+    expect(feature.status).toBe('Development')
+    expect(feature.deliveryOwner).toBe('Jira Assignee')
+    expect(feature.components).toEqual(['JiraComp'])
+    expect(feature.targetVersions).toEqual(['rhoai-3.6'])
+    expect(feature.team).toBe('JiraTeam')
+    expect(feature.dataSource).toBe('strat-creator')
+  })
+
+  it('Jira data allows strat-creator features to appear even without caches', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-1', makeJiraFeature('RHAISTRAT-1'))
+
+    var store = makeFeaturesStore({
+      'RHAISTRAT-1': { latest: makeLatest({}) }
+    })
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': store,
+      'releases/planning/config.json': CONFIG_3_6,
+      'releases/planning/health-cache-3.6-all.json': { features: [{ key: 'OTHER-1', summary: 'Other' }] }
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    var feature = result.ready.concat(result.pendingReview).find(function(f) { return f.key === 'RHAISTRAT-1' })
+    expect(feature).toBeDefined()
+  })
+
+  it('handles multiple Jira-only features sorted by priority score', function() {
+    var jiraFeatures = new Map()
+    jiraFeatures.set('RHAISTRAT-A', makeJiraFeature('RHAISTRAT-A', { priority: 'Minor' }))
+    jiraFeatures.set('RHAISTRAT-B', makeJiraFeature('RHAISTRAT-B', { priority: 'Blocker' }))
+    jiraFeatures.set('RHAISTRAT-C', makeJiraFeature('RHAISTRAT-C', { priority: 'Major' }))
+
+    var readFromStorage = makeReadFromStorage({
+      'ai-impact/features.json': makeFeaturesStore({}),
+      'releases/planning/config.json': CONFIG_3_6
+    })
+
+    var result = buildFeatureReadiness(readFromStorage, jiraFeatures)
+    expect(result.pendingReview.length).toBe(3)
+    expect(result.pendingReview[0].key).toBe('RHAISTRAT-B')
+    expect(result.pendingReview[result.pendingReview.length - 1].key).toBe('RHAISTRAT-A')
+  })
+})

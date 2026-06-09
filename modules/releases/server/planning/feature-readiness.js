@@ -137,11 +137,20 @@ function collectFilterMeta(feature, allComponents, allPriorities, allBigRocks, a
   if (feature.team) allTeams.add(feature.team)
 }
 
-function buildFeatureReadiness(readFromStorage) {
+function deriveHumanReviewStatusFromLabels(labels) {
+  if (!labels || !Array.isArray(labels)) return 'awaiting-review'
+  if (labels.indexOf('strat-creator-human-sign-off') !== -1) return 'approved'
+  if (labels.indexOf('strat-creator-needs-attention') !== -1) return 'needs-review'
+  return 'awaiting-review'
+}
+
+function buildFeatureReadiness(readFromStorage, jiraFeatures) {
   var raw = readFromStorage('ai-impact/features.json')
   if (!raw || !raw.features) {
     raw = { features: {} }
   }
+
+  var processedKeys = new Set()
 
   var candidateIndex = new Map()
   var healthIndex = new Map()
@@ -222,6 +231,7 @@ function buildFeatureReadiness(readFromStorage) {
   }
 
   var hasCaches = candidateIndex.size > 0 || healthIndex.size > 0
+  var hasJira = jiraFeatures && jiraFeatures.size > 0
 
   var pendingReview = []
   var ready = []
@@ -245,8 +255,11 @@ function buildFeatureReadiness(readFromStorage) {
 
     var candidateData = candidateIndex.get(key) || null
     var healthData = healthIndex.get(key) || null
+    var jiraData = hasJira ? (jiraFeatures.get(key) || null) : null
 
-    if (hasCaches && !candidateData && !healthData) continue
+    if (hasCaches && !candidateData && !healthData && !jiraData) continue
+
+    processedKeys.add(key)
 
     var tier = candidateData && candidateData.tier != null
       ? 'T' + candidateData.tier
@@ -264,6 +277,13 @@ function buildFeatureReadiness(readFromStorage) {
     var deliveryOwner = healthData ? healthData.deliveryOwner || null : null
     var team = teamIndex.get(key) || null
 
+    if (jiraData) {
+      if (targetVersions.length === 0 && jiraData.targetVersions.length > 0) targetVersions = jiraData.targetVersions
+      if (!fixVersion && jiraData.fixVersions && jiraData.fixVersions.length > 0) fixVersion = jiraData.fixVersions[0]
+      if (!deliveryOwner && jiraData.assignee) deliveryOwner = jiraData.assignee
+      if (!team && jiraData.team) team = jiraData.team
+    }
+
     var priorityScore = healthData ? (healthData.priorityScore != null ? healthData.priorityScore : null) : null
     var priorityScoreBreakdown = healthData ? (healthData.priorityBreakdown || healthData.priorityScoreBreakdown || null) : null
 
@@ -280,6 +300,9 @@ function buildFeatureReadiness(readFromStorage) {
     var componentsList = (latest.components && latest.components.length > 0)
       ? latest.components
       : healthComponents
+    if (componentsList.length === 0 && jiraData && jiraData.components.length > 0) {
+      componentsList = jiraData.components
+    }
 
     var violations = hygieneIndex.get(key) || null
     var isApproved = latest.humanReviewStatus === 'approved'
@@ -300,7 +323,7 @@ function buildFeatureReadiness(readFromStorage) {
       title: latest.title,
       sourceRfe: latest.sourceRfe,
       priority: latest.priority,
-      status: latest.status,
+      status: jiraData ? jiraData.status || latest.status : latest.status,
       size: latest.size,
       recommendation: latest.recommendation,
       needsAttention: latest.needsAttention,
@@ -345,10 +368,13 @@ function buildFeatureReadiness(readFromStorage) {
   var cacheKeys = Array.from(healthIndex.keys())
   for (var ci3 = 0; ci3 < cacheKeys.length; ci3++) {
     var ckey = cacheKeys[ci3]
-    if (raw.features[ckey]) continue
+    if (processedKeys.has(ckey)) continue
+
+    processedKeys.add(ckey)
 
     var hd = healthIndex.get(ckey)
     var cd = candidateIndex.get(ckey) || null
+    var jiraData2 = hasJira ? (jiraFeatures.get(ckey) || null) : null
 
     var hpTier = cd && cd.tier != null ? 'T' + cd.tier : (hd.tier || null)
     var hpRockPriority = cd ? cd.rockPriority || null : null
@@ -361,6 +387,13 @@ function buildFeatureReadiness(readFromStorage) {
       ? hd.components.split(', ').filter(Boolean)
       : []
     var hpTeam = teamIndex.get(ckey) || null
+
+    if (jiraData2) {
+      if (hpTargetVersions.length === 0 && jiraData2.targetVersions.length > 0) hpTargetVersions = jiraData2.targetVersions
+      if (!hpFixVersion && jiraData2.fixVersions && jiraData2.fixVersions.length > 0) hpFixVersion = jiraData2.fixVersions[0]
+      if (!hpTeam && jiraData2.team) hpTeam = jiraData2.team
+      if (hpComponents.length === 0 && jiraData2.components.length > 0) hpComponents = jiraData2.components
+    }
 
     var hpPriorityScore = hd.priorityScore != null ? hd.priorityScore : null
     var hpPriorityBreakdown = hd.priorityBreakdown || null
@@ -386,8 +419,8 @@ function buildFeatureReadiness(readFromStorage) {
       key: ckey,
       title: hd.summary || ckey,
       sourceRfe: null,
-      priority: hd.priority || null,
-      status: hd.status || null,
+      priority: jiraData2 ? jiraData2.priority || hd.priority : hd.priority || null,
+      status: jiraData2 ? jiraData2.status || hd.status : hd.status || null,
       size: hd.tshirtSize || null,
       recommendation: null,
       needsAttention: false,
@@ -397,7 +430,7 @@ function buildFeatureReadiness(readFromStorage) {
       scores: {},
       reviewers: {},
       components: hpComponents,
-      deliveryOwner: hd.deliveryOwner || null,
+      deliveryOwner: jiraData2 ? jiraData2.assignee || hd.deliveryOwner || null : hd.deliveryOwner || null,
       team: hpTeam,
       reviewedAt: null,
       approvedBy: null,
@@ -416,12 +449,13 @@ function buildFeatureReadiness(readFromStorage) {
       dataSource: 'health-pipeline',
       confidence: hpConfidence,
       readinessGates: {
-        ownerAssigned: !!(hd.deliveryOwner || hd.assignee),
+        ownerAssigned: !!(jiraData2 ? jiraData2.assignee || hd.deliveryOwner || hd.assignee : hd.deliveryOwner || hd.assignee),
         notBlocked: !(hd.blockerCount > 0),
         pastRefinement: !!hd.status && EARLY_STATUSES.indexOf(hd.status) === -1,
         hasTargetVersion: !!(
           (hd.targetRelease && hd.targetRelease.length > 0) ||
-          (cd && cd.targetRelease)
+          (cd && cd.targetRelease) ||
+          (hpTargetVersions.length > 0)
         ),
         noBlockingViolations: !hpBlockedByHygiene
       },
@@ -435,6 +469,100 @@ function buildFeatureReadiness(readFromStorage) {
     }
 
     collectFilterMeta(hpFeature, allComponents, allPriorities, allBigRocks, allTargetVersions, allFixVersions, allTeams)
+  }
+
+  // Third pass: Jira-only features not processed in passes 1 or 2
+  if (hasJira) {
+    var jiraKeys = Array.from(jiraFeatures.keys())
+    for (var ji = 0; ji < jiraKeys.length; ji++) {
+      var jkey = jiraKeys[ji]
+      if (processedKeys.has(jkey)) continue
+
+      processedKeys.add(jkey)
+
+      var jf = jiraFeatures.get(jkey)
+      var jfCandidateData = candidateIndex.get(jkey) || null
+      var jfViolations = hygieneIndex.get(jkey) || null
+
+      var jfTier = jfCandidateData && jfCandidateData.tier != null ? 'T' + jfCandidateData.tier : null
+      var jfBigRock = jfCandidateData ? jfCandidateData.bigRock || null : null
+      var jfRockPriority = jfCandidateData ? jfCandidateData.rockPriority || null : null
+      var jfTargetVersions = jf.targetVersions || []
+      var jfFixVersion = (jf.fixVersions && jf.fixVersions.length > 0) ? jf.fixVersions[0] : null
+      var jfTeam = teamIndex.get(jkey) || jf.team || null
+
+      var jfHumanReviewStatus = deriveHumanReviewStatusFromLabels(jf.labels)
+
+      var jfEffective = computeBestAvailableScore({
+        tier: jfTier,
+        priority: jf.priority,
+        riceScore: null,
+        rubricTotal: 0,
+        rockPriority: jfRockPriority,
+        targetVersions: jfTargetVersions
+      }, configuredVersions)
+
+      var jfBlockedByHygiene = hasBlockingViolations(jfViolations)
+      var jfIsApproved = jfHumanReviewStatus === 'approved'
+      var jfHasOwner = !!jf.assignee
+      var jfPastRefinement = !!jf.status && EARLY_STATUSES.indexOf(jf.status) === -1
+      var jfHasTargetVersion = jfTargetVersions.length > 0
+      var jfIsReady = jfIsApproved && !jfBlockedByHygiene && jfHasOwner && jfPastRefinement && jfHasTargetVersion
+      var jfConfidence = computeConfidence(jfIsReady, jfFixVersion)
+
+      var jfFeature = {
+        key: jkey,
+        title: jf.summary || jkey,
+        sourceRfe: null,
+        priority: jf.priority || null,
+        status: jf.status || null,
+        size: null,
+        recommendation: null,
+        needsAttention: false,
+        humanReviewStatus: jfHumanReviewStatus,
+        riceScore: null,
+        rubricTotal: 0,
+        scores: {},
+        reviewers: {},
+        components: jf.components || [],
+        deliveryOwner: jf.assignee || null,
+        team: jfTeam,
+        reviewedAt: null,
+        approvedBy: null,
+        approvedAt: null,
+        tier: jfTier,
+        bigRock: jfBigRock,
+        rockPriority: jfRockPriority,
+        targetVersions: jfTargetVersions,
+        fixVersion: jfFixVersion,
+        priorityScore: null,
+        priorityScoreBreakdown: null,
+        priorityScoreFallback: true,
+        effectivePriorityScore: jfEffective,
+        blockingDimensions: [],
+        actionRequired: jfHumanReviewStatus !== 'approved'
+          ? 'Open the Jira issue and add the strat-creator-human-sign-off label when ready'
+          : null,
+        dataSource: 'jira',
+        confidence: jfConfidence,
+        readinessGates: {
+          ownerAssigned: jfHasOwner,
+          notBlocked: true,
+          pastRefinement: jfPastRefinement,
+          hasTargetVersion: jfHasTargetVersion,
+          noBlockingViolations: !jfBlockedByHygiene
+        },
+        violations: jfViolations
+      }
+
+      if (jfIsReady) {
+        ready.push(jfFeature)
+      } else {
+        pendingReview.push(jfFeature)
+      }
+
+      collectFilterMeta(jfFeature, allComponents, allPriorities, allBigRocks, allTargetVersions, allFixVersions, allTeams)
+    }
   }
 
   function sortFeatures(a, b) {
@@ -469,4 +597,4 @@ function buildFeatureReadiness(readFromStorage) {
   return { pendingReview: pendingReview, ready: ready, filterMeta: filterMeta, meta: meta }
 }
 
-module.exports = { buildFeatureReadiness: buildFeatureReadiness, computeBlockers: computeBlockers, computeBestAvailableScore: computeBestAvailableScore, isHealthFeatureReady: isHealthFeatureReady, computeTierScore: computeTierScore, computeTargetVersionScore: computeTargetVersionScore, hasBlockingViolations: hasBlockingViolations, computeConfidence: computeConfidence, BLOCKING_HYGIENE_RULES: BLOCKING_HYGIENE_RULES }
+module.exports = { buildFeatureReadiness: buildFeatureReadiness, computeBlockers: computeBlockers, computeBestAvailableScore: computeBestAvailableScore, isHealthFeatureReady: isHealthFeatureReady, computeTierScore: computeTierScore, computeTargetVersionScore: computeTargetVersionScore, hasBlockingViolations: hasBlockingViolations, computeConfidence: computeConfidence, deriveHumanReviewStatusFromLabels: deriveHumanReviewStatusFromLabels, BLOCKING_HYGIENE_RULES: BLOCKING_HYGIENE_RULES }
