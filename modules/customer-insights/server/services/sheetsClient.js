@@ -1,12 +1,13 @@
 const { google } = require('googleapis')
 const { getAuthClient } = require('./googleAuth')
+const { readFromStorage, writeToStorage } = require('@shared/server')
 
 /**
  * Get configured Google Sheets API client
  * @param {object} secrets - Module secrets
  */
 async function getSheetsApi(secrets) {
-  const auth = await getAuthClient(secrets)
+  const auth = await getAuthClient(secrets, { readFromStorage, writeToStorage })
   return google.sheets({ version: 'v4', auth })
 }
 

@@ -1,17 +1,17 @@
 const { google } = require('googleapis')
-const fs = require('fs').promises
-const path = require('path')
+const { readFromStorage, writeToStorage } = require('@shared/server')
 
-const TOKEN_PATH = path.join(__dirname, '..', '..', '..', '..', 'data', 'customer-insights-google-token.json')
+const TOKEN_FILE = 'customer-insights/google-token.json'
 
 let clientInstance = null
 
 /**
  * Get or create Google OAuth2 client
  * @param {object} secrets - Module secrets from context
+ * @param {object} storage - Storage functions (readFromStorage, writeToStorage)
  * @returns {Promise<import('googleapis').Auth.OAuth2Client>}
  */
-async function getAuthClient(secrets) {
+async function getAuthClient(secrets, storage = { readFromStorage, writeToStorage }) {
   if (clientInstance) return clientInstance
 
   const clientId = secrets.GOOGLE_CLIENT_ID
@@ -30,11 +30,11 @@ async function getAuthClient(secrets) {
   // Try to load existing token
   let token
   try {
-    const tokenData = await fs.readFile(TOKEN_PATH, 'utf-8')
+    const tokenData = await storage.readFromStorage(TOKEN_FILE)
     token = JSON.parse(tokenData)
   } catch (cause) {
     throw new Error(
-      'Google Sheets not authenticated. Token not found at: ' + TOKEN_PATH +
+      'Google Sheets not authenticated. Token not found at: ' + TOKEN_FILE +
       '\nRun authentication script to generate token (see docs/MODULES.md)',
       { cause }
     )
@@ -46,8 +46,7 @@ async function getAuthClient(secrets) {
   oauth2.on('tokens', async (newTokens) => {
     const merged = { ...token, ...newTokens }
     try {
-      await fs.mkdir(path.dirname(TOKEN_PATH), { recursive: true })
-      await fs.writeFile(TOKEN_PATH, JSON.stringify(merged, null, 2), 'utf-8')
+      await storage.writeToStorage(TOKEN_FILE, JSON.stringify(merged, null, 2))
       token = merged
     } catch (err) {
       console.error('Failed to save refreshed Google token:', err)

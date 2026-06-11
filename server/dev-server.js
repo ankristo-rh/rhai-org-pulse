@@ -2083,8 +2083,35 @@ app.post('/api/admin/secrets/update', requireAdmin, requireScope('admin:manage')
       }
     });
 
-    // Update with new secrets
+    // Allowlist of env vars that can be updated via this endpoint
+    // Only module secrets and safe config vars — never system vars like PATH, NODE_ENV, etc.
+    const ALLOWED_ENV_VARS = [
+      'JIRA_EMAIL',
+      'JIRA_TOKEN',
+      'GITHUB_TOKEN',
+      'GITLAB_TOKEN',
+      'GITLAB_BASE_URL',
+      'GOOGLE_SERVICE_ACCOUNT_KEY_FILE',
+      'GOOGLE_OAUTH_CLIENT_ID',
+      'GOOGLE_OAUTH_CLIENT_SECRET',
+      'GOOGLE_PICKER_API_KEY',
+      'VITE_GOOGLE_PICKER_API_KEY',
+      'PRODUCT_PAGES_CLIENT_ID',
+      'PRODUCT_PAGES_CLIENT_SECRET',
+      'PRODUCT_PAGES_TOKEN',
+      'FEATURE_TRAFFIC_GITLAB_TOKEN',
+      'PRODUCT_BUILDS_API_URL',
+      'MODELS_CORP_API_KEY',
+      'MODELS_CORP_BASE_URL',
+      'SESSION_SECRET'
+    ];
+
+    // Update with new secrets (only allowlisted keys)
     for (const [key, value] of Object.entries(secrets)) {
+      if (!ALLOWED_ENV_VARS.includes(key)) {
+        console.warn(`Ignoring attempt to set non-allowlisted env var: ${key}`);
+        continue;
+      }
       if (value) {
         envVars[key] = value;
         // Also set in current process.env so it takes effect immediately

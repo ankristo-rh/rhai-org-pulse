@@ -55,11 +55,17 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
       res.redirect(authUrl)
     } catch (error) {
       console.error('Error initiating Google OAuth:', error)
+      const sanitizedMessage = String(error.message || 'Unknown error')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
       res.status(500).send(`
         <html>
           <body>
             <h1>Error</h1>
-            <p>${error.message}</p>
+            <p>${sanitizedMessage}</p>
             <script>window.close()</script>
           </body>
         </html>
@@ -124,7 +130,7 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
             <script>
               // Notify parent window
               if (window.opener) {
-                window.opener.postMessage({ type: 'google-oauth-success' }, '*')
+                window.opener.postMessage({ type: 'google-oauth-success' }, window.location.origin)
               }
               // Auto-close after 2 seconds
               setTimeout(() => window.close(), 2000)
@@ -134,6 +140,18 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
       `)
     } catch (error) {
       console.error('Error in Google OAuth callback:', error)
+      const sanitizedMessage = String(error.message || 'Unknown error')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+      const jsEscapedMessage = String(error.message || 'Unknown error')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
       res.send(`
         <html>
           <head>
@@ -141,10 +159,10 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
           </head>
           <body>
             <h1>✗ Connection Failed</h1>
-            <p>${error.message}</p>
+            <p>${sanitizedMessage}</p>
             <script>
               if (window.opener) {
-                window.opener.postMessage({ type: 'google-oauth-error', error: '${error.message}' }, '*')
+                window.opener.postMessage({ type: 'google-oauth-error', error: '${jsEscapedMessage}' }, window.location.origin)
               }
               setTimeout(() => window.close(), 3000)
             </script>

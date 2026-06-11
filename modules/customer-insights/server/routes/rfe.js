@@ -105,11 +105,14 @@ module.exports = function registerRfeRoutes(router, context) {
 
         // Search for similar RFEs in Jira
         // Use text search in summary and description
+        // JQL escaping: double quotes in values must be escaped as \"
+        const escapeJQL = (str) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
         const searchTerms = title.split(/\s+/).filter(w => w.length > 3).slice(0, 5).join(' ')
-        let jql = `project = RHAIRFE AND issuetype = "Feature Request" AND text ~ "${searchTerms}"`
+        let jql = `project = RHAIRFE AND issuetype = "Feature Request" AND text ~ "${escapeJQL(searchTerms)}"`
 
         if (component) {
-          jql += ` AND labels = "${component.toLowerCase().replace(/\s+/g, '-')}"`
+          const labelValue = component.toLowerCase().replace(/\s+/g, '-')
+          jql += ` AND labels = "${escapeJQL(labelValue)}"`
         }
 
         const issues = await jiraClient.search(jql, ['summary', 'description', 'status', 'labels', 'priority'], 10)
