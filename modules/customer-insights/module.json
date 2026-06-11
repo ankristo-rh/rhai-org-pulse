@@ -24,12 +24,22 @@
     "module": [
       {
         "key": "JIRA_EMAIL",
-        "description": "Jira Cloud email for RFE creation",
+        "description": "Jira Cloud email for RFE creation (legacy - use JIRA_OAUTH_* for per-user auth)",
         "required": false
       },
       {
         "key": "JIRA_TOKEN",
-        "description": "Jira Cloud API token for RFE creation",
+        "description": "Jira Cloud API token for RFE creation (legacy - use JIRA_OAUTH_* for per-user auth)",
+        "required": false
+      },
+      {
+        "key": "JIRA_OAUTH_CLIENT_ID",
+        "description": "Jira OAuth client ID for per-user RFE creation (recommended)",
+        "required": false
+      },
+      {
+        "key": "JIRA_OAUTH_CLIENT_SECRET",
+        "description": "Jira OAuth client secret for per-user RFE creation",
         "required": false
       },
       {

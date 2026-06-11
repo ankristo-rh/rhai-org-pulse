@@ -6,6 +6,7 @@ const rfeRoutes = require('./routes/rfe')
 const importRoutes = require('./routes/import')
 const extractRoutes = require('./routes/extract')
 const googleDriveAuthRoutes = require('./routes/googleDriveAuth')
+const { registerJiraOAuthRoutes } = require('@shared/server').jiraOAuth
 
 /**
  * @param {import('express').Router} router
@@ -20,4 +21,16 @@ module.exports = function registerRoutes(router, context) {
   importRoutes(router, context)
   extractRoutes(router, context)
   googleDriveAuthRoutes(router, context)
+
+  // Register Jira OAuth routes if credentials configured
+  const jiraOAuthClientId = context.secrets.JIRA_OAUTH_CLIENT_ID
+  const jiraOAuthClientSecret = context.secrets.JIRA_OAUTH_CLIENT_SECRET
+
+  if (jiraOAuthClientId && jiraOAuthClientSecret) {
+    registerJiraOAuthRoutes(router, {
+      clientId: jiraOAuthClientId,
+      clientSecret: jiraOAuthClientSecret,
+      scopes: ['write:jira-work', 'read:jira-user', 'offline_access']
+    })
+  }
 }

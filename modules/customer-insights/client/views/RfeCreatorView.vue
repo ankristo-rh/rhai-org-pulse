@@ -4,6 +4,46 @@
     <div class="mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Create RFE from Customer Feedback</h1>
       <p class="text-gray-600 mt-1">Transform customer pain points into structured RFE requests with AI-powered duplicate detection</p>
+
+      <!-- Jira Connection Status -->
+      <div v-if="!isDemoMode" class="mt-3">
+        <div v-if="jiraConnected" class="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span class="text-sm text-green-800">
+              <strong>Connected to Jira:</strong> {{ jiraSiteName }} — RFEs will be created as you
+            </span>
+          </div>
+          <button
+            @click="disconnectJira"
+            class="text-sm text-green-700 hover:text-green-900 underline"
+          >
+            Disconnect
+          </button>
+        </div>
+        <div v-else class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-blue-800">
+                <strong>Per-User Jira Authentication:</strong> Connect your Jira account to create RFEs as yourself (recommended)
+              </p>
+              <p class="text-xs text-blue-600 mt-1">
+                Or use shared credentials if configured by admin
+              </p>
+            </div>
+            <button
+              @click="connectJira"
+              :disabled="jiraConnecting"
+              class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+            >
+              {{ jiraConnecting ? 'Connecting...' : 'Connect Jira' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div v-if="isDemoMode" class="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
         <p class="text-sm text-yellow-800">
           <strong>Demo Mode:</strong> RFEs will be saved locally only. In production, RFEs are automatically created as Jira issues.
@@ -559,10 +599,18 @@ import { ref, computed, onMounted } from 'vue'
 import { useComponentSelector } from '../composables/useComponentSelector'
 import { useInteractions } from '../composables/useInteractions'
 import { useRfeCreator } from '../composables/useRfeCreator'
+import { useJiraAuth } from '@shared'
 
 const { components } = useComponentSelector()
 const { interactions } = useInteractions(ref('all'))
 const { searchSimilar, createRfe } = useRfeCreator()
+const {
+  connected: jiraConnected,
+  connecting: jiraConnecting,
+  siteName: jiraSiteName,
+  connectJira,
+  disconnectJira
+} = useJiraAuth('/api/modules/customer-insights')
 
 const currentStep = ref(1)
 const searching = ref(false)

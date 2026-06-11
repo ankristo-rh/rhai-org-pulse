@@ -1,4 +1,4 @@
-const { createJiraClient } = require('../services/jiraClient')
+const { createJiraClient, markdownToAdf } = require('../services/jiraClient')
 const { buildJiraIssueFields } = require('../services/rfeBuilder')
 
 /**
@@ -284,20 +284,57 @@ module.exports = function registerRfeRoutes(router, context) {
 
       // Production: Create actual Jira issue
       try {
-        // Get Jira credentials from secrets
-        const jiraEmail = secrets.JIRA_EMAIL
-        const jiraToken = secrets.JIRA_TOKEN
+        let jiraClient
 
-        if (!jiraEmail || !jiraToken) {
-          throw new Error('Jira credentials not configured. Set JIRA_EMAIL and JIRA_TOKEN in module secrets.')
+        // Try per-user OAuth first (if available on router)
+        if (router.getJiraClient) {
+          try {
+            const { jiraRequest } = await router.getJiraClient(req)
+            // Wrap OAuth jiraRequest to match createJiraClient interface
+            jiraClient = {
+              jiraRequest,
+              createIssue: async (fields) => {
+                // Convert description to ADF if it's a string (same as createJiraClient)
+                if (fields.description && typeof fields.description === 'string') {
+                  fields = { ...fields, description: markdownToAdf(fields.description) }
+                }
+                return jiraRequest('/rest/api/3/issue', {
+                  method: 'POST',
+                  body: { fields }
+                })
+              },
+              search: async (jql, fields, maxResults) => {
+                const params = new URLSearchParams({
+                  jql,
+                  fields: Array.isArray(fields) ? fields.join(',') : fields,
+                  maxResults: String(maxResults || 50)
+                })
+                const result = await jiraRequest(`/rest/api/3/search?${params}`)
+                return result.issues || []
+              }
+            }
+          } catch (oauthError) {
+            // OAuth not connected, fall back to shared credentials
+            console.log('Per-user Jira OAuth not connected, trying shared credentials:', oauthError.message)
+          }
         }
 
-        // Create Jira client
-        const jiraClient = createJiraClient({
-          email: jiraEmail,
-          token: jiraToken,
-          baseUrl: 'https://redhat.atlassian.net'
-        })
+        // Fall back to shared credentials if OAuth not available
+        if (!jiraClient) {
+          const jiraEmail = secrets.JIRA_EMAIL
+          const jiraToken = secrets.JIRA_TOKEN
+
+          if (!jiraEmail || !jiraToken) {
+            throw new Error('Jira credentials not configured. Either connect your Jira account (OAuth) or set JIRA_EMAIL and JIRA_TOKEN in module secrets.')
+          }
+
+          // Create Jira client with shared credentials
+          jiraClient = createJiraClient({
+            email: jiraEmail,
+            token: jiraToken,
+            baseUrl: 'https://redhat.atlassian.net'
+          })
+        }
 
         // Build Jira issue fields
         const fields = buildJiraIssueFields({
