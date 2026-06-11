@@ -179,6 +179,21 @@ function registerJiraOAuthRoutes(router, options) {
       req.session.jiraSiteUrl = resources[0].url
 
       // Close popup and notify parent window
+      // Sanitize site name for both HTML and JavaScript contexts
+      const siteName = String(resources[0].name || 'Unknown')
+      const htmlSiteName = siteName
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+      const jsSiteName = siteName
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+
       res.send(`
         <html>
           <head>
@@ -186,14 +201,14 @@ function registerJiraOAuthRoutes(router, options) {
           </head>
           <body>
             <h1>✓ Jira Connected</h1>
-            <p>Connected to ${resources[0].name}</p>
+            <p>Connected to ${htmlSiteName}</p>
             <p>You can close this window.</p>
             <script>
               // Notify parent window
               if (window.opener) {
                 window.opener.postMessage({
                   type: 'jira-oauth-success',
-                  siteName: '${resources[0].name.replace(/'/g, "\\'")}'
+                  siteName: '${jsSiteName}'
                 }, window.location.origin)
               }
               // Auto-close after 2 seconds

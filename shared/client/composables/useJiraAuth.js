@@ -15,6 +15,7 @@ export function useJiraAuth(baseUrl) {
 
   let popupWindow = null
   let messageListener = null
+  let popupCheckInterval = null
 
   // Check connection status on mount
   onMounted(async () => {
@@ -28,6 +29,9 @@ export function useJiraAuth(baseUrl) {
     }
     if (popupWindow && !popupWindow.closed) {
       popupWindow.close()
+    }
+    if (popupCheckInterval) {
+      clearInterval(popupCheckInterval)
     }
   })
 
@@ -90,9 +94,10 @@ export function useJiraAuth(baseUrl) {
       window.addEventListener('message', messageListener)
 
       // Handle popup closed before completion
-      const checkPopupClosed = setInterval(() => {
+      popupCheckInterval = setInterval(() => {
         if (popupWindow && popupWindow.closed) {
-          clearInterval(checkPopupClosed)
+          clearInterval(popupCheckInterval)
+          popupCheckInterval = null
           if (connecting.value) {
             connecting.value = false
             error.value = 'OAuth window was closed'
