@@ -193,6 +193,7 @@ function registerJiraOAuthRoutes(router, options) {
         .replace(/"/g, '\\"')
         .replace(/\n/g, '\\n')
         .replace(/\r/g, '\\r')
+        .replace(/</g, '\\u003c')
 
       res.send(`
         <html>
@@ -231,6 +232,7 @@ function registerJiraOAuthRoutes(router, options) {
         .replace(/"/g, '\\"')
         .replace(/\n/g, '\\n')
         .replace(/\r/g, '\\r')
+        .replace(/</g, '\\u003c')
       res.send(`
         <html>
           <head>
