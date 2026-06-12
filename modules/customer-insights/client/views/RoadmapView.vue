@@ -7,15 +7,30 @@
         <p class="text-gray-600 mt-1">Customer-driven initiatives and feature development</p>
       </div>
 
-      <!-- Component Selector -->
-      <select
-        v-model="selectedComponent"
-        class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-      >
-        <option v-for="c in components" :key="c.id" :value="c.id">
-          {{ c.label }}
-        </option>
-      </select>
+      <div class="flex gap-3 items-center">
+        <!-- Component Selector -->
+        <select
+          v-model="selectedComponent"
+          class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          <option v-for="c in components" :key="c.id" :value="c.id">
+            {{ c.label }}
+          </option>
+        </select>
+
+        <!-- Generate Roadmap Button -->
+        <button
+          @click="generateRoadmap"
+          :disabled="generating"
+          class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          <svg v-if="generating" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          {{ generating ? 'Generating...' : 'Generate Roadmap with AI' }}
+        </button>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -119,6 +134,95 @@
                 :item="item"
                 @click="selectedItem = item"
               />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Recommendations -->
+      <div v-if="roadmap.aiRecommendations" class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg shadow-lg p-6 border border-purple-200">
+        <div class="flex items-center gap-2 mb-6">
+          <Sparkles class="w-6 h-6 text-purple-600" />
+          <h2 class="text-xl font-semibold text-gray-900">AI Recommended Actions</h2>
+          <span class="ml-auto text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded">Powered by Gemini AI</span>
+        </div>
+
+        <!-- Quick Actions -->
+        <div v-if="roadmap.aiRecommendations.quickActions?.length" class="mb-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Zap class="w-5 h-5 text-yellow-600" />
+            Quick Wins - Improve Existing RFEs
+          </h3>
+          <div class="space-y-3">
+            <div
+              v-for="action in roadmap.aiRecommendations.quickActions"
+              :key="action.id"
+              class="bg-white rounded-lg p-4 border border-purple-200 hover:border-purple-400 transition-colors"
+            >
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ action.rfeKey }}</span>
+                    <h4 class="font-medium text-gray-900">{{ action.title }}</h4>
+                  </div>
+                  <p class="text-sm text-gray-600 mb-3">{{ action.description }}</p>
+                  <div v-if="action.suggestedChanges" class="text-xs text-gray-500 space-y-1">
+                    <div v-if="action.suggestedChanges.priority">
+                      <span class="font-medium">Priority:</span> → {{ action.suggestedChanges.priority }}
+                    </div>
+                    <div v-if="action.suggestedChanges.labels">
+                      <span class="font-medium">Add labels:</span> {{ action.suggestedChanges.labels.join(', ') }}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  @click="executeAction(action.id)"
+                  :disabled="executingAction === action.id"
+                  class="ml-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium whitespace-nowrap"
+                >
+                  {{ executingAction === action.id ? 'Updating...' : 'Apply Now' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Suggested RFEs -->
+        <div v-if="roadmap.aiRecommendations.suggestedRFEs?.length">
+          <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Lightbulb class="w-5 h-5 text-yellow-500" />
+            Suggested New RFEs - Ready to Submit
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              v-for="suggestion in roadmap.aiRecommendations.suggestedRFEs"
+              :key="suggestion.id"
+              class="bg-white rounded-lg p-4 border border-purple-200 hover:border-purple-400 transition-all hover:shadow-md cursor-pointer"
+              @click="createFromSuggestion(suggestion)"
+            >
+              <div class="flex items-start justify-between mb-2">
+                <h4 class="font-medium text-gray-900 flex-1">{{ suggestion.title }}</h4>
+                <span :class="priorityBadgeClass(suggestion.priority)">{{ suggestion.priority }}</span>
+              </div>
+              <p class="text-sm text-gray-600 mb-3 line-clamp-2">{{ suggestion.businessJustification }}</p>
+              <div class="flex items-center justify-between text-xs text-gray-500">
+                <div class="flex items-center gap-2">
+                  <Users class="w-3 h-3" />
+                  <span>{{ suggestion.sourceCustomers?.length || 0 }} customers</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="bg-gray-100 px-2 py-0.5 rounded">{{ suggestion.component }}</span>
+                  <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{{ suggestion.estimatedEffort }}</span>
+                </div>
+              </div>
+              <div class="mt-3 pt-3 border-t border-gray-100">
+                <button class="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1">
+                  <span>Click to auto-fill RFE form</span>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -397,8 +501,9 @@
     <!-- No Data State -->
     <div v-else class="bg-white rounded-lg shadow p-12 text-center">
       <div class="text-gray-500 mb-4">
-        <p class="font-medium text-lg mb-2">Coming Soon</p>
-        <p class="text-sm">Roadmap data is populated from customer interactions and RFEs.</p>
+        <Lightbulb class="w-16 h-16 mx-auto mb-4 text-gray-400" />
+        <p class="font-medium text-lg mb-2">No Roadmap Generated Yet</p>
+        <p class="text-sm mb-6">Click "Generate Roadmap with AI" above to analyze customer interactions and Jira RFEs to create strategic product recommendations.</p>
       </div>
     </div>
 
@@ -536,11 +641,76 @@ import RoadmapCard from '../components/RoadmapCard.vue'
 import { Calendar, Users, Sparkles, TrendingUp, Target, Zap, Lightbulb, AlertTriangle, ListChecks } from 'lucide-vue-next'
 
 const { components, selectedComponent } = useComponentSelector()
-const { roadmap, loading, error } = useRoadmap(selectedComponent)
+const { roadmap, loading, error, refresh } = useRoadmap(selectedComponent)
 const moduleNav = inject('moduleNav')
 
 const selectedItem = ref(null)
 const appliedAdjustments = ref([])
+const generating = ref(false)
+const executingAction = ref(null)
+
+async function generateRoadmap() {
+  generating.value = true
+  try {
+    const response = await fetch('/api/modules/customer-insights/roadmap/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ component: selectedComponent.value })
+    })
+
+    if (!response.ok) {
+      const errData = await response.json()
+      throw new Error(errData.error || `HTTP ${response.status}`)
+    }
+
+    // Refresh the roadmap display
+    await refresh()
+  } catch (err) {
+    alert(`Failed to generate roadmap: ${err.message}`)
+  } finally {
+    generating.value = false
+  }
+}
+
+async function executeAction(actionId) {
+  if (!confirm('Execute this action? This will update the Jira RFE.')) {
+    return
+  }
+
+  executingAction.value = actionId
+  try {
+    const response = await fetch('/api/modules/customer-insights/roadmap/execute-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionId })
+    })
+
+    if (!response.ok) {
+      const errData = await response.json()
+      throw new Error(errData.error || `HTTP ${response.status}`)
+    }
+
+    const result = await response.json()
+    alert(result.message || 'Action executed successfully!')
+
+    // Refresh to remove the completed action
+    await refresh()
+  } catch (err) {
+    alert(`Failed to execute action: ${err.message}`)
+  } finally {
+    executingAction.value = null
+  }
+}
+
+function createFromSuggestion(suggestion) {
+  // Store the suggestion data for the RFE creator
+  sessionStorage.setItem('rfe-prefill', JSON.stringify(suggestion))
+
+  // Navigate to RFE creator
+  if (moduleNav) {
+    moduleNav.navigateTo('rfe-creator')
+  }
+}
 
 const itemsByTimeframe = computed(() => {
   if (!roadmap.value?.items) {

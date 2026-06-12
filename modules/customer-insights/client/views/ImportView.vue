@@ -6,8 +6,33 @@
     </div>
 
     <!-- Status Message -->
-    <div v-if="uploadSuccess" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-      <p class="text-green-800">✅ Successfully imported {{ uploadSuccess }} interactions!</p>
+    <div v-if="uploadSuccess" class="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+      <div class="flex items-start justify-between">
+        <div class="flex-1">
+          <p class="text-green-800 font-medium text-lg mb-2">✅ {{ uploadSuccess }}</p>
+          <p class="text-green-700 text-sm">Your data has been saved to Google Sheets and is ready to view.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+          <button
+            @click="goToTable"
+            class="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 font-medium flex items-center space-x-2 transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Table View</span>
+          </button>
+          <button
+            @click="goToKanban"
+            class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium flex items-center space-x-2 shadow-sm transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <span>Kanban Board</span>
+          </button>
+        </div>
+      </div>
     </div>
     <div v-if="uploadError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
       <p class="text-red-800">❌ Error: {{ uploadError }}</p>
@@ -409,8 +434,10 @@ Meeting with John Smith from Acme Financial Corp (Banking, North America)
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { useGoogleDrive } from '../composables/useGoogleDrive'
+
+const moduleNav = inject('moduleNav')
 
 const activeTab = ref('spreadsheet')
 const selectedFile = ref(null)
@@ -539,7 +566,7 @@ async function uploadFile() {
     }
 
     const result = await response.json()
-    uploadSuccess.value = result.created || interactions.length
+    uploadSuccess.value = `Successfully imported ${result.created || interactions.length} interactions!`
     clearFile()
   } catch (error) {
     console.error('Upload error:', error)
@@ -664,7 +691,7 @@ async function submitTranscript() {
       throw new Error(error.error || 'Failed to create interaction')
     }
 
-    uploadSuccess.value = 1
+    uploadSuccess.value = 'Successfully created 1 interaction!'
     clearTranscript()
   } catch (error) {
     console.error('Transcript submission error:', error)
@@ -774,5 +801,17 @@ async function processCSVContent(csvText, filename) {
 
   const result = await response.json()
   uploadSuccess.value = `Successfully imported ${result.created || interactions.length} interactions from "${filename}"!`
+}
+
+function goToKanban() {
+  if (moduleNav) {
+    moduleNav.navigateTo('kanban')
+  }
+}
+
+function goToTable() {
+  if (moduleNav) {
+    moduleNav.navigateTo('table')
+  }
 }
 </script>

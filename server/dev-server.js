@@ -175,6 +175,19 @@ const PORT = process.env.API_PORT || 3001;
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
+// Session middleware for OAuth flows (Google Drive + Jira per-user auth)
+const session = require('express-session');
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production-' + Date.now(),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in prod
+    httpOnly: true,
+    maxAge: 90 * 24 * 60 * 60 * 1000 // 90 days (matches Jira refresh token lifetime)
+  }
+}));
+
 // Enable CORS
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");

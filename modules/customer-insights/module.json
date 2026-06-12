@@ -13,7 +13,8 @@
       { "id": "insights", "label": "AI Insights", "icon": "Brain" },
       { "id": "roadmap", "label": "Roadmap", "icon": "Map", "separatorBefore": true },
       { "id": "rfe-creator", "label": "Create RFE", "icon": "PenSquare" },
-      { "id": "import", "label": "Import Data", "icon": "FileUp" }
+      { "id": "import", "label": "Import Data", "icon": "FileUp" },
+      { "id": "settings", "label": "Settings", "icon": "Settings", "separatorBefore": true }
     ],
     "settingsComponent": "./client/components/CustomerInsightsSettings.vue"
   },
@@ -43,18 +44,18 @@
         "required": false
       },
       {
-        "key": "GOOGLE_CLIENT_ID",
-        "description": "Google OAuth client ID for Sheets API",
+        "key": "GOOGLE_OAUTH_CLIENT_ID",
+        "description": "Google OAuth client ID for per-user Google Sheets and Drive access (recommended)",
         "required": false
       },
       {
-        "key": "GOOGLE_CLIENT_SECRET",
-        "description": "Google OAuth client secret for Sheets API",
+        "key": "GOOGLE_OAUTH_CLIENT_SECRET",
+        "description": "Google OAuth client secret for per-user authentication",
         "required": false
       },
       {
-        "key": "GOOGLE_SPREADSHEET_ID",
-        "description": "Customer interactions spreadsheet ID",
+        "key": "GOOGLE_PICKER_API_KEY",
+        "description": "Google Picker API key for spreadsheet selection UI",
         "required": false
       },
       {
@@ -65,21 +66,6 @@
       {
         "key": "MODELS_CORP_BASE_URL",
         "description": "Base URL for models.corp API (e.g., https://granite-3-3-8b-instruct--apicast-production.apps.int.stc.ai.prod.us-east-1.aws.paas.redhat.com:443)",
-        "required": false
-      },
-      {
-        "key": "GOOGLE_OAUTH_CLIENT_ID",
-        "description": "Google OAuth client ID for Drive file picking (per-user authentication)",
-        "required": false
-      },
-      {
-        "key": "GOOGLE_OAUTH_CLIENT_SECRET",
-        "description": "Google OAuth client secret for Drive file picking",
-        "required": false
-      },
-      {
-        "key": "GOOGLE_PICKER_API_KEY",
-        "description": "Google Picker API key for file selection UI",
         "required": false
       }
     ]

@@ -44,7 +44,7 @@
     </div>
 
     <!-- Insights Content -->
-    <div v-else-if="insights" class="space-y-6">
+    <div v-else-if="insights && insights.painPoints" class="space-y-6">
       <!-- Latest Insights -->
       <div class="bg-white rounded-lg shadow p-6">
         <div class="flex justify-between items-start mb-4">

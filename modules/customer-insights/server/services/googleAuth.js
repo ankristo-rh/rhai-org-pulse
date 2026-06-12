@@ -1,5 +1,5 @@
 const { google } = require('googleapis')
-const { readFromStorage, writeToStorage } = require('@shared/server')
+const { readFromStorage, writeToStorage } = require('../../../../shared/server')
 
 const TOKEN_FILE = 'customer-insights/google-token.json'
 

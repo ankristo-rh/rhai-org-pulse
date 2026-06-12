@@ -1,6 +1,6 @@
 const { google } = require('googleapis')
 const { getAuthClient } = require('./googleAuth')
-const { readFromStorage, writeToStorage } = require('@shared/server')
+const { readFromStorage, writeToStorage } = require('../../../../shared/server')
 
 /**
  * Get configured Google Sheets API client

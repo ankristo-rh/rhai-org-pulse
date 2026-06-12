@@ -6,7 +6,7 @@ const rfeRoutes = require('./routes/rfe')
 const importRoutes = require('./routes/import')
 const extractRoutes = require('./routes/extract')
 const googleDriveAuthRoutes = require('./routes/googleDriveAuth')
-const { registerJiraOAuthRoutes } = require('@shared/server').jiraOAuth
+const { registerJiraOAuthRoutes } = require('../../../shared/server').jiraOAuth
 
 /**
  * @param {import('express').Router} router

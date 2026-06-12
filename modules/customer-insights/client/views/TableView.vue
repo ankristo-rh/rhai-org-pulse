@@ -90,9 +90,17 @@
       <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
         <div class="flex justify-between items-start mb-4">
           <h2 class="text-xl font-bold">{{ selectedInteraction.customerCompany }}</h2>
-          <button @click="selectedInteraction = null" class="text-gray-400 hover:text-gray-600">
-            ✕
-          </button>
+          <div class="flex items-center space-x-2">
+            <button
+              @click="deleteInteraction(selectedInteraction.id)"
+              class="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded border border-red-300"
+            >
+              Delete
+            </button>
+            <button @click="selectedInteraction = null" class="text-gray-400 hover:text-gray-600">
+              ✕
+            </button>
+          </div>
         </div>
 
         <div class="space-y-4">
@@ -142,6 +150,29 @@ const { components, selectedComponent } = useComponentSelector()
 const { interactions, loading, error } = useInteractions(selectedComponent)
 
 const selectedInteraction = ref(null)
+
+async function deleteInteraction(id) {
+  if (!confirm('Are you sure you want to delete this interaction?')) {
+    return
+  }
+
+  try {
+    const response = await fetch(`/api/modules/customer-insights/interactions/${id}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to delete interaction')
+    }
+
+    // Close modal and reload data
+    selectedInteraction.value = null
+    // Trigger a reload by toggling the component filter or force refresh
+    window.location.reload()
+  } catch (err) {
+    alert('Error deleting interaction: ' + err.message)
+  }
+}
 
 function componentClass(component) {
   const classes = {

@@ -29,7 +29,7 @@
     </div>
 
     <!-- No Data State -->
-    <div v-else-if="!analytics || Object.keys(analytics).length === 0" class="bg-white rounded-lg shadow p-12 text-center">
+    <div v-else-if="!analytics || !hasAnyData" class="bg-white rounded-lg shadow p-12 text-center">
       <div class="text-gray-500 mb-4">
         <p class="font-medium text-lg mb-2">Coming Soon</p>
         <p class="text-sm">Analytics will appear once customer interactions are imported.</p>
@@ -37,9 +37,9 @@
     </div>
 
     <!-- Charts Grid -->
-    <div v-else-if="analytics" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <!-- Customers by Geo -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="geoChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Customers by Geo</h3>
         <div class="h-64">
           <Doughnut :data="geoChartData" :options="chartOptions" />
@@ -47,7 +47,7 @@
       </div>
 
       <!-- Customers by Industry -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="industryChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Customers by Industry</h3>
         <div class="h-64">
           <Bar :data="industryChartData" :options="horizontalBarOptions" />
@@ -55,7 +55,7 @@
       </div>
 
       <!-- Customers by Environment -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="environmentChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Customers by Environment</h3>
         <div class="h-64">
           <Bar :data="environmentChartData" :options="chartOptions" />
@@ -63,7 +63,7 @@
       </div>
 
       <!-- Interactions by Status -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="statusChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Interactions by Status</h3>
         <div class="h-64">
           <Bar :data="statusChartData" :options="chartOptions" />
@@ -71,7 +71,7 @@
       </div>
 
       <!-- SSA vs CAI -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="customerTypeChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">SSA vs CAI</h3>
         <div class="h-64">
           <Doughnut :data="customerTypeChartData" :options="chartOptions" />
@@ -79,7 +79,7 @@
       </div>
 
       <!-- Top AI Tools -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="toolsChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Top AI Tools</h3>
         <div class="h-64">
           <Pie :data="toolsChartData" :options="chartOptions" />
@@ -87,7 +87,7 @@
       </div>
 
       <!-- Top Wishlist Items -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="wishlistChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Wishlist Items</h3>
         <div class="h-64">
           <Bar :data="wishlistChartData" :options="horizontalBarOptions" />
@@ -95,7 +95,7 @@
       </div>
 
       <!-- Pain Point Keywords -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="painPointsChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Pain Point Keywords</h3>
         <div class="h-64">
           <Bar :data="painPointsChartData" :options="horizontalBarOptions" />
@@ -103,7 +103,7 @@
       </div>
 
       <!-- Use Case Categories -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div v-if="useCasesChartData" class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">AI Use Case Categories</h3>
         <div class="h-64">
           <Pie :data="useCasesChartData" :options="chartOptions" />
@@ -125,6 +125,15 @@ ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale,
 
 const { components, selectedComponent } = useComponentSelector()
 const { analytics, loading, error } = useAnalytics(selectedComponent)
+
+// Check if analytics has any data
+const hasAnyData = computed(() => {
+  if (!analytics.value) return false
+  const hasGeo = analytics.value.byGeo && Object.keys(analytics.value.byGeo).length > 0
+  const hasIndustry = analytics.value.byIndustry && Object.keys(analytics.value.byIndustry).length > 0
+  const hasStatus = analytics.value.byStatus && Object.keys(analytics.value.byStatus).length > 0
+  return hasGeo || hasIndustry || hasStatus
+})
 
 const chartOptions = {
   responsive: true,

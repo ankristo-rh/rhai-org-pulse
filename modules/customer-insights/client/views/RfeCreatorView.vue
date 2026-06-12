@@ -599,7 +599,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useComponentSelector } from '../composables/useComponentSelector'
 import { useInteractions } from '../composables/useInteractions'
 import { useRfeCreator } from '../composables/useRfeCreator'
-import { useJiraAuth } from '@shared'
+import { useJiraAuth } from '@shared/client/composables/useJiraAuth'
 
 const { components } = useComponentSelector()
 const { interactions } = useInteractions(ref('all'))
@@ -754,6 +754,36 @@ function goBackToEdit() {
 function proceedToReview() {
   currentStep.value = 3
 }
+
+// Check for prefilled data from roadmap suggestions
+onMounted(() => {
+  const prefillData = sessionStorage.getItem('rfe-prefill')
+  if (prefillData) {
+    try {
+      const suggestion = JSON.parse(prefillData)
+      // Auto-fill the form
+      rfe.value = {
+        sourceInteractionId: '',
+        component: suggestion.component || '',
+        title: suggestion.title || '',
+        businessJustification: suggestion.businessJustification || '',
+        technicalDetails: suggestion.technicalDetails || '',
+        useCases: suggestion.useCases || '',
+        customerCompany: suggestion.customerCompany || '',
+        industryVertical: suggestion.industryVertical || '',
+        arrImpact: suggestion.arrImpact || '',
+        priority: suggestion.priority || 'Medium'
+      }
+      // Clear the prefill data
+      sessionStorage.removeItem('rfe-prefill')
+
+      // Show a notification
+      alert('Form pre-filled with AI suggestion! Review and adjust as needed.')
+    } catch (err) {
+      console.error('Failed to load prefill data:', err)
+    }
+  }
+})
 
 // Pre-fill form from URL params on mount
 onMounted(() => {

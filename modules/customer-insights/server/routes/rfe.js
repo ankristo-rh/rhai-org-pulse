@@ -376,7 +376,7 @@ module.exports = function registerRfeRoutes(router, context) {
           arrImpact,
           status: 'Submitted',
           createdAt: new Date().toISOString(),
-          createdBy: req.user?.email || 'unknown',
+          createdBy: req.userEmail || 'unknown',
           jiraIssue: {
             key: result.key,
             summary: title,

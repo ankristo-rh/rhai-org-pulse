@@ -1,5 +1,9 @@
 const { google } = require('googleapis')
 const crypto = require('crypto')
+const tokenStore = require('../services/userTokenStore')
+
+// In-memory state tokens for OAuth (keyed by state token, value is user email)
+const oauthStates = new Map()
 
 /**
  * Google Drive OAuth routes for per-user authentication.
@@ -9,7 +13,7 @@ const crypto = require('crypto')
  * @param {import('@shared/server/module-context').ModuleContext} context
  */
 module.exports = function registerGoogleDriveAuthRoutes(router, context) {
-  const { secrets } = context
+  const { secrets, requireAuth } = context
 
   // OAuth client configuration
   function getOAuthClient() {
@@ -37,17 +41,28 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
    *       302:
    *         description: Redirects to Google OAuth consent screen
    */
-  router.get('/auth/google', (req, res) => {
+  router.get('/auth/google', requireAuth, (req, res) => {
     try {
       const oauth2Client = getOAuthClient()
+      const userEmail = req.userEmail
+
+      if (!userEmail) {
+        throw new Error('User email not found')
+      }
 
       // Generate state token for CSRF protection
       const state = crypto.randomBytes(32).toString('hex')
-      req.session.oauthState = state
+      oauthStates.set(state, userEmail)
+
+      // Clean up old state tokens (older than 10 minutes)
+      setTimeout(() => oauthStates.delete(state), 10 * 60 * 1000)
 
       const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline', // Get refresh token
-        scope: ['https://www.googleapis.com/auth/drive.readonly'],
+        scope: [
+          'https://www.googleapis.com/auth/drive.readonly',
+          'https://www.googleapis.com/auth/spreadsheets' // Read and write Google Sheets
+        ],
         state,
         prompt: 'consent' // Force consent screen to get refresh token
       })
@@ -99,24 +114,25 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
       const { code, state } = req.query
 
       // Validate state token (CSRF protection)
-      if (!state || state !== req.session.oauthState) {
+      const userEmail = oauthStates.get(state)
+      if (!state || !userEmail) {
         throw new Error('Invalid state token. Possible CSRF attack.')
       }
 
       // Clear state token
-      delete req.session.oauthState
+      oauthStates.delete(state)
 
       const oauth2Client = getOAuthClient()
 
       // Exchange authorization code for tokens
       const { tokens } = await oauth2Client.getToken(code)
 
-      // Store tokens in session (HTTP-only cookie)
-      req.session.googleTokens = {
+      // Store tokens for this user
+      await tokenStore.saveTokens(userEmail, {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expiry_date: tokens.expiry_date
-      }
+      })
 
       // Close popup and notify parent window
       res.send(`
@@ -189,9 +205,13 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
    *                 connected:
    *                   type: boolean
    */
-  router.get('/auth/google/status', (req, res) => {
-    const connected = !!(req.session.googleTokens?.access_token)
-    res.json({ connected })
+  router.get('/auth/google/status', requireAuth, async (req, res) => {
+    const userEmail = req.userEmail
+    if (!userEmail) {
+      return res.json({ connected: false })
+    }
+    const tokens = await tokenStore.getTokens(userEmail)
+    res.json({ connected: !!(tokens?.access_token) })
   })
 
   /**
@@ -204,9 +224,66 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
    *       200:
    *         description: Successfully disconnected
    */
-  router.post('/auth/google/disconnect', (req, res) => {
-    delete req.session.googleTokens
+  router.post('/auth/google/disconnect', requireAuth, async (req, res) => {
+    const userEmail = req.userEmail
+    if (userEmail) {
+      await tokenStore.deleteTokens(userEmail)
+    }
     res.json({ success: true })
+  })
+
+  /**
+   * @openapi
+   * /api/modules/customer-insights/auth/google/token:
+   *   get:
+   *     summary: Get Google access token for Picker API
+   *     tags: [Customer Insights]
+   *     responses:
+   *       200:
+   *         description: Access token
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 accessToken:
+   *                   type: string
+   */
+  router.get('/auth/google/token', requireAuth, async (req, res) => {
+    const userEmail = req.userEmail
+    if (!userEmail) {
+      return res.status(401).json({ error: 'Not authenticated' })
+    }
+    const tokens = await tokenStore.getTokens(userEmail)
+    if (!tokens?.access_token) {
+      return res.status(401).json({ error: 'Not authenticated with Google' })
+    }
+    res.json({ accessToken: tokens.access_token })
+  })
+
+  /**
+   * @openapi
+   * /api/modules/customer-insights/auth/google/picker-config:
+   *   get:
+   *     summary: Get Google Picker API configuration
+   *     tags: [Customer Insights]
+   *     responses:
+   *       200:
+   *         description: Picker API key
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 apiKey:
+   *                   type: string
+   */
+  router.get('/auth/google/picker-config', requireAuth, (req, res) => {
+    const apiKey = secrets.GOOGLE_PICKER_API_KEY
+    if (!apiKey) {
+      return res.status(503).json({ error: 'Google Picker API key not configured' })
+    }
+    res.json({ apiKey })
   })
 
   /**
@@ -292,5 +369,55 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
       console.error('Error downloading file from Drive:', error)
       res.status(500).json({ error: error.message })
     }
+  })
+
+  /**
+   * @openapi
+   * /api/modules/customer-insights/spreadsheet/config:
+   *   get:
+   *     summary: Get configured Google Spreadsheet ID
+   *     tags: [Customer Insights]
+   *     responses:
+   *       200:
+   *         description: Current spreadsheet configuration
+   */
+  router.get('/spreadsheet/config', requireAuth, async (req, res) => {
+    const userEmail = req.userEmail
+    if (!userEmail) {
+      return res.json({ spreadsheetId: null, spreadsheetName: null })
+    }
+    const config = await tokenStore.getSpreadsheetConfig(userEmail)
+    res.json(config || { spreadsheetId: null, spreadsheetName: null })
+  })
+
+  /**
+   * @openapi
+   * /api/modules/customer-insights/spreadsheet/config:
+   *   post:
+   *     summary: Set Google Spreadsheet ID for interactions storage
+   *     tags: [Customer Insights]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               spreadsheetId:
+   *                 type: string
+   *               spreadsheetName:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Configuration saved
+   */
+  router.post('/spreadsheet/config', requireAuth, async (req, res) => {
+    const userEmail = req.userEmail
+    if (!userEmail) {
+      return res.status(401).json({ error: 'Not authenticated' })
+    }
+    const { spreadsheetId, spreadsheetName } = req.body
+    await tokenStore.saveSpreadsheetConfig(userEmail, spreadsheetId, spreadsheetName)
+    res.json({ success: true })
   })
 }
