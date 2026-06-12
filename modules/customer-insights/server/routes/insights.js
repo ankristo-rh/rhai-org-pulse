@@ -1,6 +1,6 @@
 const { createModelsCorpClient } = require('../services/modelsCorpClient')
 const { google } = require('googleapis')
-const tokenStore = require('../services/userTokenStore')
+const { createUserTokenStore } = require('../services/userTokenStore')
 
 /**
  * @param {import('express').Router} router
@@ -10,6 +10,7 @@ module.exports = function registerInsightsRoutes(router, context) {
   const { storage, secrets, requireAuth } = context
   const { readFromStorage, writeToStorage } = storage
   const isDemoMode = process.env.DEMO_MODE === 'true'
+  const tokenStore = createUserTokenStore(storage)
 
   /**
    * @openapi

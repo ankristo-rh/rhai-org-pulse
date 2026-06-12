@@ -1,6 +1,6 @@
 const { google } = require('googleapis')
 const crypto = require('crypto')
-const tokenStore = require('../services/userTokenStore')
+const { createUserTokenStore } = require('../services/userTokenStore')
 
 // In-memory state tokens for OAuth (keyed by state token, value is user email)
 const oauthStates = new Map()
@@ -13,7 +13,8 @@ const oauthStates = new Map()
  * @param {import('@shared/server/module-context').ModuleContext} context
  */
 module.exports = function registerGoogleDriveAuthRoutes(router, context) {
-  const { secrets, requireAuth } = context
+  const { storage, secrets, requireAuth } = context
+  const tokenStore = createUserTokenStore(storage)
 
   // OAuth client configuration
   function getOAuthClient() {
@@ -314,16 +315,23 @@ module.exports = function registerGoogleDriveAuthRoutes(router, context) {
    *                 content:
    *                   type: string
    */
-  router.get('/drive/files/:fileId', async (req, res) => {
+  router.get('/drive/files/:fileId', requireAuth, async (req, res) => {
     try {
       const { fileId } = req.params
+      const userEmail = req.userEmail
 
-      if (!req.session.googleTokens) {
+      if (!userEmail) {
+        return res.status(401).json({ error: 'User not authenticated' })
+      }
+
+      // Get tokens from token store (not session)
+      const googleTokens = await tokenStore.getTokens(userEmail)
+      if (!googleTokens) {
         return res.status(401).json({ error: 'Not authenticated with Google Drive' })
       }
 
       const oauth2Client = getOAuthClient()
-      oauth2Client.setCredentials(req.session.googleTokens)
+      oauth2Client.setCredentials(googleTokens)
 
       const drive = google.drive({ version: 'v3', auth: oauth2Client })
 

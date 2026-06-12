@@ -1,5 +1,5 @@
 const { google } = require('googleapis')
-const tokenStore = require('../services/userTokenStore')
+const { createUserTokenStore } = require('../services/userTokenStore')
 
 /**
  * @param {import('express').Router} router
@@ -10,6 +10,7 @@ module.exports = function registerInteractionsRoutes(router, context) {
   const { readFromStorage } = storage
 
   const isDemoMode = process.env.DEMO_MODE === 'true'
+  const tokenStore = createUserTokenStore(storage)
 
   /**
    * Get authenticated Google Sheets API client for the current user
@@ -158,9 +159,8 @@ module.exports = function registerInteractionsRoutes(router, context) {
   router.get('/interactions', requireAuth, async (req, res) => {
     try {
       if (isDemoMode) {
-        // Return demo fixtures
-        const fixturesData = await readFromStorage('customer-insights/interactions.json')
-        let data = JSON.parse(fixturesData || '[]')
+        // Return demo fixtures (readFromStorage already returns parsed JSON)
+        let data = readFromStorage('customer-insights/interactions.json') || []
 
         // Apply filters
         const { component, status, geo, industryVertical } = req.query

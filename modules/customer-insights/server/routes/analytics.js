@@ -1,5 +1,5 @@
 const { google } = require('googleapis')
-const tokenStore = require('../services/userTokenStore')
+const { createUserTokenStore } = require('../services/userTokenStore')
 
 /**
  * @param {import('express').Router} router
@@ -9,6 +9,7 @@ module.exports = function registerAnalyticsRoutes(router, context) {
   const { storage, requireAuth, secrets } = context
   const { readFromStorage } = storage
   const isDemoMode = process.env.DEMO_MODE === 'true'
+  const tokenStore = createUserTokenStore(storage)
 
   /**
    * @openapi

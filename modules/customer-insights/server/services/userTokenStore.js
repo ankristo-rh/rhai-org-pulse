@@ -1,99 +1,91 @@
 /**
- * Simple user token storage for Google OAuth tokens
- * Stores tokens in local JSON file keyed by user email
+ * User token storage for Google OAuth tokens
+ * Uses storage abstractions to respect demo mode and PVC mounts
  */
 
-const path = require('path')
-const fs = require('fs').promises
-
-const TOKEN_FILE = path.join(process.cwd(), 'data', 'customer-insights', 'user-tokens.json')
+// Storage will be injected via createUserTokenStore factory
+let storage = null
 
 /**
- * Get tokens for a user
- * @param {string} userEmail
- * @returns {Promise<object|null>}
+ * Create a user token store with the given storage backend
+ * @param {object} storageBackend - { readFromStorage, writeToStorage }
+ * @returns {object} Token store methods
  */
-async function getTokens(userEmail) {
-  try {
-    const data = await fs.readFile(TOKEN_FILE, 'utf8')
-    const tokens = JSON.parse(data)
-    return tokens[userEmail] || null
-  } catch (err) {
-    if (err.code === 'ENOENT') return null
-    throw err
+function createUserTokenStore(storageBackend) {
+  storage = storageBackend
+  const { readFromStorage, writeToStorage } = storage
+
+  const TOKEN_KEY = 'customer-insights/user-tokens.json'
+
+  /**
+   * Get tokens for a user
+   * @param {string} userEmail
+   * @returns {Promise<object|null>}
+   */
+  async function getTokens(userEmail) {
+    const allTokens = readFromStorage(TOKEN_KEY) || {}
+    return allTokens[userEmail] || null
+  }
+
+  /**
+   * Save tokens for a user
+   * @param {string} userEmail
+   * @param {object} tokens
+   */
+  async function saveTokens(userEmail, tokens) {
+    const allTokens = readFromStorage(TOKEN_KEY) || {}
+
+    allTokens[userEmail] = {
+      ...tokens,
+      updatedAt: new Date().toISOString()
+    }
+
+    writeToStorage(TOKEN_KEY, allTokens)
+  }
+
+  /**
+   * Delete tokens for a user
+   * @param {string} userEmail
+   */
+  async function deleteTokens(userEmail) {
+    const allTokens = readFromStorage(TOKEN_KEY) || {}
+    delete allTokens[userEmail]
+    writeToStorage(TOKEN_KEY, allTokens)
+  }
+
+  /**
+   * Get spreadsheet config for a user
+   * @param {string} userEmail
+   * @returns {Promise<object|null>}
+   */
+  async function getSpreadsheetConfig(userEmail) {
+    const tokens = await getTokens(userEmail)
+    return tokens ? {
+      spreadsheetId: tokens.spreadsheetId || null,
+      spreadsheetName: tokens.spreadsheetName || null
+    } : null
+  }
+
+  /**
+   * Save spreadsheet config for a user
+   * @param {string} userEmail
+   * @param {string} spreadsheetId
+   * @param {string} spreadsheetName
+   */
+  async function saveSpreadsheetConfig(userEmail, spreadsheetId, spreadsheetName) {
+    const tokens = await getTokens(userEmail) || {}
+    tokens.spreadsheetId = spreadsheetId
+    tokens.spreadsheetName = spreadsheetName
+    await saveTokens(userEmail, tokens)
+  }
+
+  return {
+    getTokens,
+    saveTokens,
+    deleteTokens,
+    getSpreadsheetConfig,
+    saveSpreadsheetConfig
   }
 }
 
-/**
- * Save tokens for a user
- * @param {string} userEmail
- * @param {object} tokens
- */
-async function saveTokens(userEmail, tokens) {
-  let allTokens = {}
-  try {
-    const data = await fs.readFile(TOKEN_FILE, 'utf8')
-    allTokens = JSON.parse(data)
-  } catch (err) {
-    if (err.code !== 'ENOENT') throw err
-  }
-
-  allTokens[userEmail] = {
-    ...tokens,
-    updatedAt: new Date().toISOString()
-  }
-
-  // Ensure directory exists
-  await fs.mkdir(path.dirname(TOKEN_FILE), { recursive: true })
-  await fs.writeFile(TOKEN_FILE, JSON.stringify(allTokens, null, 2))
-}
-
-/**
- * Delete tokens for a user
- * @param {string} userEmail
- */
-async function deleteTokens(userEmail) {
-  try {
-    const data = await fs.readFile(TOKEN_FILE, 'utf8')
-    const tokens = JSON.parse(data)
-    delete tokens[userEmail]
-    await fs.writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2))
-  } catch (err) {
-    if (err.code === 'ENOENT') return
-    throw err
-  }
-}
-
-/**
- * Get spreadsheet config for a user
- * @param {string} userEmail
- * @returns {Promise<object|null>}
- */
-async function getSpreadsheetConfig(userEmail) {
-  const tokens = await getTokens(userEmail)
-  return tokens ? {
-    spreadsheetId: tokens.spreadsheetId || null,
-    spreadsheetName: tokens.spreadsheetName || null
-  } : null
-}
-
-/**
- * Save spreadsheet config for a user
- * @param {string} userEmail
- * @param {string} spreadsheetId
- * @param {string} spreadsheetName
- */
-async function saveSpreadsheetConfig(userEmail, spreadsheetId, spreadsheetName) {
-  const tokens = await getTokens(userEmail) || {}
-  tokens.spreadsheetId = spreadsheetId
-  tokens.spreadsheetName = spreadsheetName
-  await saveTokens(userEmail, tokens)
-}
-
-module.exports = {
-  getTokens,
-  saveTokens,
-  deleteTokens,
-  getSpreadsheetConfig,
-  saveSpreadsheetConfig
-}
+module.exports = { createUserTokenStore }

@@ -1,5 +1,5 @@
 const { google } = require('googleapis')
-const tokenStore = require('../services/userTokenStore')
+const { createUserTokenStore } = require('../services/userTokenStore')
 const { createModelsCorpClient } = require('../services/modelsCorpClient')
 const { createJiraClient } = require('../services/jiraClient')
 
@@ -11,6 +11,7 @@ module.exports = function registerRoadmapRoutes(router, context) {
   const { storage, requireAuth, secrets } = context
   const { readFromStorage, writeToStorage } = storage
   const isDemoMode = process.env.DEMO_MODE === 'true'
+  const tokenStore = createUserTokenStore(storage)
 
   /**
    * @openapi
